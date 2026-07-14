@@ -1,0 +1,66 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  /* MD3 color roles — baseline purple tonal palette, DARK scheme */
+  --color-primary: #d0bcff;
+  --color-on-primary: #381e72;
+  --color-primary-container: #4f378b;
+  --color-on-primary-container: #eaddff;
+
+  --color-secondary: #ccc2dc;
+  --color-on-secondary: #332d41;
+  --color-secondary-container: #4a4458;
+  --color-on-secondary-container: #e8def8;
+
+  --color-surface: #141218;
+  --color-surface-container: #211f26;
+  --color-on-surface: #e6e1e5;
+  --color-surface-variant: #49454f;
+  --color-on-surface-variant: #cac4d0;
+
+  --color-error: #f2b8b5;
+  --color-on-error: #601410;
+  --color-error-container: #8c1d18;
+  --color-on-error-container: #f9dede;
+
+  --color-outline: #938f99;
+  --color-outline-variant: #49454f;
+
+  /* MD3 shape scale */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+
+  /* MD3 type scale (subset used by this app) */
+  --font-size-headline-small: 24px;
+  --line-height-headline-small: 32px;
+  --font-size-title-large: 22px;
+  --line-height-title-large: 28px;
+  --font-size-title-medium: 16px;
+  --line-height-title-medium: 24px;
+  --font-size-body-large: 16px;
+  --line-height-body-large: 24px;
+  --font-size-body-medium: 14px;
+  --line-height-body-medium: 20px;
+  --font-size-label-large: 14px;
+  --line-height-label-large: 20px;
+
+  /* MD3 elevation, approximated via box-shadow */
+  --shadow-elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --shadow-elevation-2: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --shadow-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.3), 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
