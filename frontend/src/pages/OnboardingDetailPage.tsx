@@ -50,10 +50,13 @@ export function OnboardingDetailPage() {
     setApproving(true);
     try {
       const updated = await approveOnboarding(id);
-      setRecord(updated);
+      navigate("/", {
+        state: {
+          toastMessage: `Approved and sent to ${updated.employeeEmail}.`,
+        },
+      });
     } catch (err) {
       setError((err as Error).message);
-    } finally {
       setApproving(false);
     }
   }

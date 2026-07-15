@@ -1,23 +1,37 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { deleteOnboarding, listOnboardings } from "../api/client";
 import type { OnboardingRecord } from "../api/types";
 import { Card } from "../components/Card";
 import { Chip } from "../components/Chip";
 import { IconButton } from "../components/IconButton";
 import { Spinner } from "../components/Spinner";
+import { Toast } from "../components/Toast";
 import { TrashIcon } from "../components/TrashIcon";
 
 export function OnboardingListPage() {
   const [records, setRecords] = useState<OnboardingRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [toastMessage, setToastMessage] = useState<string | null>(
+    (location.state as { toastMessage?: string } | null)?.toastMessage ?? null
+  );
 
   useEffect(() => {
     listOnboardings()
       .then(setRecords)
       .catch((err) => setError(err.message));
+  }, []);
+
+  useEffect(() => {
+    // Clear the navigation state so the toast doesn't reappear on refresh/back-navigation.
+    if (toastMessage) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDelete(e: MouseEvent, id: string, employeeName: string) {
@@ -50,8 +64,10 @@ export function OnboardingListPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
-      <h1 className="mb-6 text-headline-small font-medium text-on-surface">Onboardings</h1>
+    <>
+      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+      <div className="mx-auto max-w-6xl p-8">
+        <h1 className="mb-6 text-headline-small font-medium text-on-surface">Onboardings</h1>
 
       {records.length === 0 ? (
         <Card className="text-on-surface-variant">
@@ -88,6 +104,7 @@ export function OnboardingListPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
