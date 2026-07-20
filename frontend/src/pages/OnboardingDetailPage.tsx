@@ -105,6 +105,44 @@ export function OnboardingDetailPage() {
         <Chip tone={record.status === "approved" ? "primary" : "secondary"}>{record.status}</Chip>
       </div>
 
+      {(record.startDate || record.buddyEmail || record.seniority || record.location || record.notes) && (
+        <Card className="mb-6">
+          <SectionTitle>Additional details</SectionTitle>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-body-medium">
+            {record.startDate && (
+              <>
+                <dt className="text-on-surface-variant">Start date</dt>
+                <dd className="text-on-surface">{record.startDate}</dd>
+              </>
+            )}
+            {record.buddyEmail && (
+              <>
+                <dt className="text-on-surface-variant">Buddy</dt>
+                <dd className="text-on-surface">{record.buddyEmail}</dd>
+              </>
+            )}
+            {record.seniority && (
+              <>
+                <dt className="text-on-surface-variant">Seniority</dt>
+                <dd className="text-on-surface">{record.seniority}</dd>
+              </>
+            )}
+            {record.location && (
+              <>
+                <dt className="text-on-surface-variant">Location</dt>
+                <dd className="text-on-surface">{record.location}</dd>
+              </>
+            )}
+            {record.notes && (
+              <>
+                <dt className="text-on-surface-variant">Notes</dt>
+                <dd className="col-span-2 text-on-surface">{record.notes}</dd>
+              </>
+            )}
+          </dl>
+        </Card>
+      )}
+
       {record.status === "approved" && record.notification && (
         <Card tint="primary" className="mb-6">
           Sent to <strong>{record.notification.sentTo}</strong> at{" "}

@@ -61,6 +61,11 @@ export interface OnboardingRecord {
   employeeEmail: string;
   profileId: string;
   projectId: string;
+  startDate?: string;
+  buddyEmail?: string;
+  seniority?: string;
+  location?: string;
+  notes?: string;
   createdAt: string;
   status: OnboardingStatus;
   approvedAt?: string;

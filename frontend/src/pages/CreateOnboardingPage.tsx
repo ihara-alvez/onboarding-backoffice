@@ -17,6 +17,11 @@ export function CreateOnboardingPage() {
   const [employeeEmail, setEmployeeEmail] = useState("");
   const [profileId, setProfileId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [buddyEmail, setBuddyEmail] = useState("");
+  const [seniority, setSeniority] = useState("");
+  const [location, setLocation] = useState("");
+  const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +42,17 @@ export function CreateOnboardingPage() {
     setSubmitting(true);
     try {
       const record = await createOnboardingWithProgress(
-        { employeeName, employeeEmail, profileId, projectId },
+        {
+          employeeName,
+          employeeEmail,
+          profileId,
+          projectId,
+          startDate: startDate || undefined,
+          buddyEmail: buddyEmail || undefined,
+          seniority: seniority || undefined,
+          location: location || undefined,
+          notes: notes || undefined,
+        },
         (event) => setEvents((prev) => [...prev, event])
       );
       navigate(`/onboardings/${record.id}`);
@@ -96,6 +111,33 @@ export function CreateOnboardingPage() {
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
           options={projects.map((p) => ({ value: p.id, label: p.name }))}
+        />
+        <TextField
+          label="Start date (optional)"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+        <TextField
+          label="Buddy email (optional)"
+          type="email"
+          value={buddyEmail}
+          onChange={(e) => setBuddyEmail(e.target.value)}
+        />
+        <TextField
+          label="Seniority (optional)"
+          value={seniority}
+          onChange={(e) => setSeniority(e.target.value)}
+        />
+        <TextField
+          label="Location (optional)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <TextField
+          label="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
         />
         <Button type="submit" className="mt-2 self-start">
           Create onboarding
