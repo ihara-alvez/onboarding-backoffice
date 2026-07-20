@@ -9,6 +9,7 @@ import { IconButton } from "../components/IconButton";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { TrashIcon } from "../components/TrashIcon";
+import { statusTone } from "../statusDisplay";
 
 export function OnboardingListPage() {
   const [records, setRecords] = useState<OnboardingRecord[] | null>(null);
@@ -88,7 +89,7 @@ export function OnboardingListPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Chip tone={r.status === "approved" ? "primary" : "secondary"}>{r.status}</Chip>
+                  <Chip tone={statusTone(r.status)}>{r.status}</Chip>
                   <IconButton
                     tone="error"
                     aria-label={`Delete onboarding for ${r.employeeName}`}
