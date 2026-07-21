@@ -15,3 +15,7 @@
 - source_spec: none
   summary: Employee-facing frontoffice app giving employees access to the chat app from the other project
   evidence: User explicitly framed this as "once we have this MVP" — pre-deferred by the user's own sequencing, not part of the current multi-goal split.
+
+## Deferred from: code review of 1-1-six-state-status-model-migration-log-schema (2026-07-21)
+
+- Handle a valid JSON store whose root value is not an array. This is pre-existing behavior: `readAll()` already assumed an array and would fail at `.map()` before Story 1.1.
