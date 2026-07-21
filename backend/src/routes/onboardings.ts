@@ -26,7 +26,8 @@ function sseWrite(res: import("express").Response, event: string, data: unknown)
 }
 
 onboardingsRouter.post("/", async (req, res) => {
-  const { employeeName, employeeEmail, profileId, projectId } = req.body ?? {};
+  const { employeeName, employeeEmail, profileId, projectId, startDate, buddyEmail, seniority, location, notes } =
+    req.body ?? {};
   if (!employeeName || !employeeEmail || !profileId || !projectId) {
     res.status(400).json({ error: "employeeName, employeeEmail, profileId, projectId are required" });
     return;
@@ -67,6 +68,11 @@ onboardingsRouter.post("/", async (req, res) => {
     employeeEmail,
     profileId,
     projectId,
+    startDate: startDate || undefined,
+    buddyEmail: buddyEmail || undefined,
+    seniority: seniority || undefined,
+    location: location || undefined,
+    notes: notes || undefined,
     createdAt: new Date().toISOString(),
     status: "created",
     plan,
