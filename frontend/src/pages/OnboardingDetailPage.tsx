@@ -258,6 +258,22 @@ export function OnboardingDetailPage() {
       )}
 
       <Card className="mb-6">
+        <Collapsible label={`Action log (${record.actionLog.length} entries)`}>
+          <div className="flex flex-col gap-2">
+            {record.actionLog.map((entry) => (
+              <div key={entry.id} className="text-body-medium">
+                <span className="text-on-surface-variant">
+                  {new Date(entry.timestamp).toLocaleString()} &middot;{" "}
+                  {entry.actor === "manager" ? "Manager" : "System"} &middot;{" "}
+                </span>
+                <span className="text-on-surface">{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </Collapsible>
+      </Card>
+
+      <Card className="mb-6">
         <SectionTitle>Repositories</SectionTitle>
         <div className="flex flex-col gap-4">
           {project.repositories.map((repo) => (
