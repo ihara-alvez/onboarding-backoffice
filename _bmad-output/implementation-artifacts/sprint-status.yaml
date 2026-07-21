@@ -55,7 +55,7 @@ development_status:
   1-4-approve-action-automatic-post-approval-transitions: done
   1-5-manual-recovery-completion-actions: done
   1-6-requested-vs-approved-permission-labeling: review
-  1-7-progress-timeline-display: ready-for-dev
+  1-7-progress-timeline-display: review
   1-8-full-action-log-display-immutability-guarantee: ready-for-dev
   epic-1-retrospective: optional
 

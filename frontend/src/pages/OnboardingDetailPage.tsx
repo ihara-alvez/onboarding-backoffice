@@ -9,7 +9,7 @@ import {
   retryGeneration,
   sendForApproval,
 } from "../api/client";
-import type { OnboardingRecord } from "../api/types";
+import type { OnboardingRecord, OnboardingStatus } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Chip } from "../components/Chip";
@@ -36,6 +36,27 @@ function BulletList({ items }: { items: string[] }) {
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="mb-3 text-title-medium font-medium text-on-surface">{children}</h2>;
+}
+
+interface ProgressEntry {
+  status: OnboardingStatus;
+  timestamp: string;
+}
+
+/** Derives the Progress timeline from actionLog, plus (if applicable) the
+ * synthetic read-time ready_for_day_1 -> in_progress flip, which is never
+ * itself written to actionLog (see Story 1.4). */
+function buildProgressEntries(record: OnboardingRecord): ProgressEntry[] {
+  const entries: ProgressEntry[] = record.actionLog
+    .filter((entry) => entry.toStatus !== undefined)
+    .map((entry) => ({ status: entry.toStatus as OnboardingStatus, timestamp: entry.timestamp }));
+
+  const last = entries[entries.length - 1];
+  if (record.status === "in_progress" && last?.status === "ready_for_day_1" && record.startDate) {
+    entries.push({ status: "in_progress", timestamp: record.startDate });
+  }
+
+  return entries;
 }
 
 export function OnboardingDetailPage() {
@@ -139,6 +160,7 @@ export function OnboardingDetailPage() {
   }
 
   const { profile, project } = record;
+  const progressEntries = buildProgressEntries(record);
 
   return (
     <div className="mx-auto max-w-5xl p-8">
@@ -199,6 +221,20 @@ export function OnboardingDetailPage() {
           {new Date(record.notification.sentAt).toLocaleTimeString()}.
         </Card>
       )}
+
+      <Card className="mb-6">
+        <SectionTitle>Progress</SectionTitle>
+        <div className="flex flex-col gap-2">
+          {progressEntries.map((entry, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-body-medium text-on-surface-variant">
+                {new Date(entry.timestamp).toLocaleString()}
+              </span>
+              <Chip tone={statusTone(entry.status)}>{entry.status}</Chip>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card tint="primary" className="mb-6">
         <p className="mb-2 text-label-large font-medium text-on-primary-container/80">
