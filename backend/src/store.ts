@@ -1,9 +1,35 @@
 import fs from "fs";
 import path from "path";
-import { OnboardingRecord } from "./types";
+import { ActionLogEntry, OnboardingRecord, OnboardingStatus } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "onboardings.json");
+
+// Shape of a record as it may actually exist on disk: `status` may still be a
+// legacy value ("created"/"approved") predating the six-state model, and
+// `actionLog` may be entirely absent on records written before it existed.
+type RawOnboardingRecord = Omit<OnboardingRecord, "status" | "actionLog"> & {
+  status: string;
+  actionLog?: ActionLogEntry[];
+};
+
+// Migrates a legacy record to the current six-state model and ensures
+// `actionLog` defaults to `[]`. Idempotent: already-migrated records pass
+// through unchanged. Called on every read inside `readAll()` rather than a
+// one-off migration script (this app has no migration runner) — the next
+// `writeAll()` from any caller persists the migrated value going forward.
+function normalizeRecord(raw: RawOnboardingRecord): OnboardingRecord {
+  let status: OnboardingStatus;
+  if (raw.status === "created") {
+    status = "draft";
+  } else if (raw.status === "approved") {
+    const hasFutureOrNoStartDate = !raw.startDate || new Date(raw.startDate).getTime() > Date.now();
+    status = hasFutureOrNoStartDate ? "ready_for_day_1" : "in_progress";
+  } else {
+    status = raw.status as OnboardingStatus;
+  }
+  return { ...raw, status, actionLog: raw.actionLog ?? [] };
+}
 
 function ensureStore(): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -12,7 +38,8 @@ function ensureStore(): void {
 
 function readAll(): OnboardingRecord[] {
   ensureStore();
-  return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as OnboardingRecord[];
+  const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as RawOnboardingRecord[];
+  return raw.map(normalizeRecord);
 }
 
 function writeAll(records: OnboardingRecord[]): void {
@@ -38,7 +65,9 @@ export function approveOnboarding(id: string): OnboardingRecord | undefined {
   const now = new Date().toISOString();
   all[idx] = {
     ...all[idx],
-    status: "approved",
+    // Placeholder — Story 1.4 replaces this with real start_date-conditional
+    // branching between "ready_for_day_1" and "in_progress".
+    status: "ready_for_day_1",
     approvedAt: now,
     notification: { sentTo: all[idx].employeeEmail, sentAt: now, channel: "email (simulated)" },
   };

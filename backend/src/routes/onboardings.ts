@@ -74,11 +74,14 @@ onboardingsRouter.post("/", async (req, res) => {
     location: location || undefined,
     notes: notes || undefined,
     createdAt: new Date().toISOString(),
-    status: "created",
+    // Placeholder — Story 1.2 replaces this with real draft/blocked branching
+    // on narrativeOutcome.ok.
+    status: "draft",
     plan,
     narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
     narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
     events: collectedEvents,
+    actionLog: [],
     profile,
     project,
   };
@@ -94,7 +97,7 @@ onboardingsRouter.post("/:id/approve", (req, res) => {
     res.status(404).json({ error: `Onboarding '${req.params.id}' not found` });
     return;
   }
-  if (existing.status === "approved") {
+  if (existing.status !== "draft") {
     res.json(existing);
     return;
   }

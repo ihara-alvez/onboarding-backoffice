@@ -47,13 +47,37 @@ export interface NotificationRecord {
   channel: string;
 }
 
-export type OnboardingStatus = "created" | "approved";
+export type OnboardingStatus =
+  | "draft"
+  | "pending_approval"
+  | "ready_for_day_1"
+  | "in_progress"
+  | "blocked"
+  | "completed";
 
 export type ProgressEvent =
   | { type: "status"; message: string }
   | { type: "tool_call"; tool: string; count: number }
   | { type: "reasoning"; text: string }
   | { type: "text"; text: string; complete: boolean };
+
+export type ActionLogEntryType =
+  | "status_change"
+  | "approve"
+  | "delete"
+  | "chat_message"
+  | "generation_failure"
+  | "retry";
+
+export interface ActionLogEntry {
+  id: string;
+  timestamp: string; // ISO 8601
+  actor: "manager" | "system";
+  type: ActionLogEntryType;
+  message: string;
+  fromStatus?: OnboardingStatus;
+  toStatus?: OnboardingStatus;
+}
 
 export interface OnboardingRecord {
   id: string;
@@ -74,6 +98,7 @@ export interface OnboardingRecord {
   narrative: string | null;
   narrativeError?: string;
   events: ProgressEvent[];
+  actionLog: ActionLogEntry[];
   profile: Profile;
   project: Project;
 }

@@ -12,6 +12,7 @@ import { Markdown } from "../components/Markdown";
 import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
 import { TrashIcon } from "../components/TrashIcon";
+import { statusTone } from "../statusDisplay";
 
 function BulletList({ items }: { items: string[] }) {
   if (items.length === 0) {
@@ -102,7 +103,7 @@ export function OnboardingDetailPage() {
             Created {new Date(record.createdAt).toLocaleString()}
           </p>
         </div>
-        <Chip tone={record.status === "approved" ? "primary" : "secondary"}>{record.status}</Chip>
+        <Chip tone={statusTone(record.status)}>{record.status}</Chip>
       </div>
 
       {(record.startDate || record.buddyEmail || record.seniority || record.location || record.notes) && (
@@ -143,7 +144,7 @@ export function OnboardingDetailPage() {
         </Card>
       )}
 
-      {record.status === "approved" && record.notification && (
+      {record.notification && (
         <Card tint="primary" className="mb-6">
           Sent to <strong>{record.notification.sentTo}</strong> at{" "}
           {new Date(record.notification.sentAt).toLocaleTimeString()}.
@@ -226,7 +227,7 @@ ${repo.test}`}
       </Card>
 
       <div className="flex items-center gap-3">
-        {record.status === "created" && (
+        {record.status === "draft" && (
           <Button onClick={handleApprove} disabled={approving || deleting}>
             {approving ? "Approving..." : "Approve & send to employee"}
           </Button>
