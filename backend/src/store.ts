@@ -22,6 +22,17 @@ type RawOnboardingRecord = Omit<OnboardingRecord, "status" | "actionLog"> & {
   actionLog?: ActionLogEntry[];
 };
 
+function parseDateOnlyUtc(startDate: string): number | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return undefined;
+  const timestamp = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  if (Number.isNaN(timestamp)) return undefined;
+  const date = new Date(timestamp);
+  const normalized = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("-");
+  return normalized === startDate ? timestamp : undefined;
+}
+
 // Migrates a legacy record to the current six-state model and ensures
 // `actionLog` defaults to `[]`. Idempotent: already-migrated records pass
 // through unchanged. Called on every read inside `readAll()` rather than a
@@ -32,14 +43,28 @@ function normalizeRecord(raw: RawOnboardingRecord): OnboardingRecord {
   if (raw.status === "created") {
     status = "draft";
   } else if (raw.status === "approved") {
-    const hasFutureOrNoStartDate = !raw.startDate || new Date(raw.startDate).getTime() > Date.now();
-    status = hasFutureOrNoStartDate ? "ready_for_day_1" : "in_progress";
+    status = computeApprovalStatus(raw.startDate);
   } else if (VALID_STATUSES.has(raw.status as OnboardingStatus)) {
     status = raw.status as OnboardingStatus;
   } else {
     throw new Error(`Invalid onboarding status: ${raw.status}`);
   }
   return { ...raw, status, actionLog: raw.actionLog ?? [] };
+}
+
+export function computeApprovalStatus(startDate?: string): "ready_for_day_1" | "in_progress" {
+  if (!startDate) return "ready_for_day_1";
+  const timestamp = parseDateOnlyUtc(startDate);
+  if (timestamp === undefined) throw new Error("Invalid start date: expected YYYY-MM-DD");
+  return timestamp <= Date.now() ? "in_progress" : "ready_for_day_1";
+}
+
+export function computeEffectiveStatus(record: OnboardingRecord): OnboardingStatus {
+  const startTimestamp = record.startDate ? parseDateOnlyUtc(record.startDate) : undefined;
+  if (record.status === "ready_for_day_1" && startTimestamp !== undefined && startTimestamp <= Date.now()) {
+    return "in_progress";
+  }
+  return record.status;
 }
 
 function ensureStore(): void {
@@ -58,10 +83,14 @@ function writeAll(records: OnboardingRecord[]): void {
 }
 
 export const listOnboardings = (): OnboardingRecord[] =>
-  readAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  readAll()
+    .map((record) => ({ ...record, status: computeEffectiveStatus(record) }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 export const getOnboarding = (id: string): OnboardingRecord | undefined =>
-  readAll().find((r) => r.id === id);
+  readAll()
+    .map((record) => ({ ...record, status: computeEffectiveStatus(record) }))
+    .find((r) => r.id === id);
 
 export function saveOnboarding(record: OnboardingRecord): void {
   const all = readAll();
@@ -128,14 +157,28 @@ export function approveOnboarding(id: string): StoreResult {
   if (all[idx].status !== "pending_approval") {
     return { ok: false, error: "Cannot approve: plan changed, please review again" };
   }
+  if (all[idx].startDate && parseDateOnlyUtc(all[idx].startDate) === undefined) {
+    return { ok: false, error: "Cannot approve: invalid start date, expected YYYY-MM-DD" };
+  }
   const now = new Date().toISOString();
+  const toStatus = computeApprovalStatus(all[idx].startDate);
   all[idx] = {
     ...all[idx],
-    // Placeholder — Story 1.4 replaces this with real start_date-conditional
-    // branching between "ready_for_day_1" and "in_progress".
-    status: "ready_for_day_1",
+    status: toStatus,
     approvedAt: now,
     notification: { sentTo: all[idx].employeeEmail, sentAt: now, channel: "email (simulated)" },
+    actionLog: [
+      ...all[idx].actionLog,
+      {
+        id: crypto.randomUUID(),
+        timestamp: now,
+        actor: "manager",
+        type: "approve",
+        fromStatus: "pending_approval",
+        toStatus,
+        message: "Approved onboarding",
+      },
+    ],
   };
   writeAll(all);
   return { ok: true, record: all[idx] };
