@@ -55,14 +55,21 @@ export async function createOnboardingWithProgress(
   body: CreateOnboardingRequest,
   onProgress: (event: ProgressEvent) => void
 ): Promise<OnboardingRecord> {
-  const res = await fetch("/api/onboardings", {
+  return streamRequest<OnboardingRecord>("/api/onboardings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, onProgress);
+}
 
+async function streamRequest<T>(
+  url: string,
+  options: RequestInit,
+  onProgress: (event: ProgressEvent) => void
+): Promise<T> {
+  const res = await fetch(url, options);
   if (!res.ok) {
-    return handle<OnboardingRecord>(res);
+    return handle<T>(res);
   }
   if (!res.body) {
     throw new Error("Streaming response has no body (unsupported environment)");
@@ -91,7 +98,10 @@ export async function createOnboardingWithProgress(
       if (eventName === "progress") {
         onProgress(data as ProgressEvent);
       } else if (eventName === "done") {
-        return data as OnboardingRecord;
+        return data as T;
+      } else if (eventName === "error") {
+        const errorData = data as { error?: unknown };
+        throw new Error(typeof errorData.error === "string" ? errorData.error : "Unable to complete streaming request");
       }
     }
   }
@@ -99,8 +109,24 @@ export async function createOnboardingWithProgress(
   throw new Error("Stream ended without a completion event");
 }
 
+export function retryGeneration(id: string, onProgress: (event: ProgressEvent) => void): Promise<OnboardingRecord> {
+  return streamRequest<OnboardingRecord>(`/api/onboardings/${id}/retry`, { method: "POST" }, onProgress);
+}
+
+export function markCompleted(id: string): Promise<OnboardingRecord> {
+  return fetch(`/api/onboardings/${id}/complete`, { method: "POST" }).then((r) =>
+    handle<OnboardingRecord>(r)
+  );
+}
+
 export function approveOnboarding(id: string): Promise<OnboardingRecord> {
   return fetch(`/api/onboardings/${id}/approve`, { method: "POST" }).then((r) =>
+    handle<OnboardingRecord>(r)
+  );
+}
+
+export function sendForApproval(id: string): Promise<OnboardingRecord> {
+  return fetch(`/api/onboardings/${id}/send-for-approval`, { method: "POST" }).then((r) =>
     handle<OnboardingRecord>(r)
   );
 }
