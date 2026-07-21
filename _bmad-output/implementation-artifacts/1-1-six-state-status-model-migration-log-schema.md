@@ -4,7 +4,7 @@ baseline_commit: 2a8aa036a5e73cec22b33cc14e93127bf104bacb
 
 # Story 1.1: Six-State Status Model, Migration & Log Schema
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -128,3 +128,8 @@ None — no failures encountered. Verification commands run: `backend/npm run bu
 ## Change Log
 
 - 2026-07-20 — Implemented Story 1.1: six-state status model, legacy-data migration, and Action Log schema. All 4 tasks complete, all 4 ACs satisfied and verified. Status → review.
+
+### Review Findings
+
+- [x] [Review][Patch] Reject or safely normalize unknown persisted status values instead of casting them to `OnboardingStatus` [backend/src/store.ts:36-38] — AC3 requires every displayed status to be one of the six current values; an unexpected value in persisted JSON now fails normalization instead of reaching the API and frontend.
+- [x] [Review][Defer] Handle a valid JSON store whose root value is not an array [backend/src/store.ts:41-42] — deferred, pre-existing; `readAll()` already assumed an array and would fail at `.map()` before this story.

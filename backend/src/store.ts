@@ -4,6 +4,14 @@ import { ActionLogEntry, OnboardingRecord, OnboardingStatus } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "onboardings.json");
+const VALID_STATUSES = new Set<OnboardingStatus>([
+  "draft",
+  "pending_approval",
+  "ready_for_day_1",
+  "in_progress",
+  "blocked",
+  "completed",
+]);
 
 // Shape of a record as it may actually exist on disk: `status` may still be a
 // legacy value ("created"/"approved") predating the six-state model, and
@@ -25,8 +33,10 @@ function normalizeRecord(raw: RawOnboardingRecord): OnboardingRecord {
   } else if (raw.status === "approved") {
     const hasFutureOrNoStartDate = !raw.startDate || new Date(raw.startDate).getTime() > Date.now();
     status = hasFutureOrNoStartDate ? "ready_for_day_1" : "in_progress";
-  } else {
+  } else if (VALID_STATUSES.has(raw.status as OnboardingStatus)) {
     status = raw.status as OnboardingStatus;
+  } else {
+    throw new Error(`Invalid onboarding status: ${raw.status}`);
   }
   return { ...raw, status, actionLog: raw.actionLog ?? [] };
 }
