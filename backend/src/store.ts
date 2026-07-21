@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { ActionLogEntry, OnboardingRecord, OnboardingStatus } from "./types";
+import { ActionLogEntry, OnboardingRecord, OnboardingStatus, ProgressEvent } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "onboardings.json");
@@ -43,7 +43,11 @@ function normalizeRecord(raw: RawOnboardingRecord): OnboardingRecord {
   if (raw.status === "created") {
     status = "draft";
   } else if (raw.status === "approved") {
-    status = computeApprovalStatus(raw.startDate);
+    try {
+      status = computeApprovalStatus(raw.startDate);
+    } catch {
+      status = "ready_for_day_1";
+    }
   } else if (VALID_STATUSES.has(raw.status as OnboardingStatus)) {
     status = raw.status as OnboardingStatus;
   } else {
@@ -98,17 +102,91 @@ export function saveOnboarding(record: OnboardingRecord): void {
   writeAll(all);
 }
 
-export function updateOnboarding(record: OnboardingRecord): void {
+export function finalizeGeneration(
+  id: string,
+  plan: string,
+  outcome: { ok: true; narrative: string } | { ok: false; error: string },
+  events: ProgressEvent[]
+): OnboardingRecord {
   const all = readAll();
-  const idx = all.findIndex((candidate) => candidate.id === record.id);
-  if (idx === -1) throw new Error(`Onboarding '${record.id}' not found`);
-  all[idx] = record;
+  const idx = all.findIndex((record) => record.id === id);
+  if (idx === -1) throw new Error(`Onboarding '${id}' not found`);
+  const current = all[idx];
+  if (current.status !== "blocked") return current;
+
+  const timestamp = new Date().toISOString();
+  const entry: ActionLogEntry = outcome.ok
+    ? {
+        id: crypto.randomUUID(),
+        timestamp,
+        actor: "system",
+        type: "status_change",
+        fromStatus: "blocked",
+        toStatus: "draft",
+        message: "Plan generated successfully",
+      }
+    : {
+        id: crypto.randomUUID(),
+        timestamp,
+        actor: "system",
+        type: "generation_failure",
+        fromStatus: "blocked",
+        toStatus: "blocked",
+        message: outcome.error,
+      };
+  all[idx] = {
+    ...current,
+    status: outcome.ok ? "draft" : "blocked",
+    plan,
+    narrative: outcome.ok ? outcome.narrative : null,
+    narrativeError: outcome.ok ? undefined : outcome.error,
+    events,
+    actionLog: [...current.actionLog, entry],
+  };
   writeAll(all);
+  return all[idx];
+}
+
+export function finalizeRetry(
+  id: string,
+  plan: string,
+  outcome: { ok: true; narrative: string } | { ok: false; error: string },
+  events: ProgressEvent[]
+): OnboardingRecord {
+  const all = readAll();
+  const idx = all.findIndex((record) => record.id === id);
+  if (idx === -1) throw new Error(`Onboarding '${id}' not found`);
+  const current = all[idx];
+  const timestamp = new Date().toISOString();
+  const entry: ActionLogEntry = {
+    id: crypto.randomUUID(),
+    timestamp,
+    actor: "manager",
+    type: "retry",
+    fromStatus: "blocked",
+    toStatus: outcome.ok ? "draft" : "blocked",
+    message: outcome.ok ? "Retry succeeded" : outcome.error,
+  };
+  all[idx] = {
+    ...current,
+    ...(current.status === "blocked"
+      ? {
+          status: outcome.ok ? "draft" : "blocked",
+          plan,
+          narrative: outcome.ok ? outcome.narrative : null,
+          narrativeError: outcome.ok ? undefined : outcome.error,
+          events,
+        }
+      : {}),
+    actionLog: [...current.actionLog, entry],
+  };
+  writeAll(all);
+  return all[idx];
 }
 
 export type StoreResult =
   | { ok: true; record: OnboardingRecord }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: "not_found" };
 
 function appendStatusChange(
   record: OnboardingRecord,
@@ -137,7 +215,7 @@ function appendStatusChange(
 export function sendForApproval(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "draft") {
     return { ok: false, error: "Cannot send for approval: onboarding is not a draft" };
   }
@@ -149,7 +227,7 @@ export function sendForApproval(id: string): StoreResult {
 export function revertToDraft(id: string, reason: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "pending_approval") {
     return { ok: false, error: "Cannot revert to draft: onboarding is not pending approval" };
   }
@@ -161,7 +239,7 @@ export function revertToDraft(id: string, reason: string): StoreResult {
 export function approveOnboarding(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "pending_approval") {
     return { ok: false, error: "Cannot approve: plan changed, please review again" };
   }
@@ -195,7 +273,7 @@ export function approveOnboarding(id: string): StoreResult {
 export function markCompleted(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   const fromStatus = computeEffectiveStatus(all[idx]);
   if (fromStatus !== "in_progress") {
     return { ok: false, error: "Cannot mark complete: onboarding is not in progress" };

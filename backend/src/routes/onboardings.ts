@@ -7,13 +7,15 @@ import {
   listOnboardings,
   getOnboarding,
   saveOnboarding,
-  updateOnboarding,
   approveOnboarding,
   deleteOnboarding,
   markCompleted,
   sendForApproval,
+  computeApprovalStatus,
+  finalizeGeneration,
+  finalizeRetry,
 } from "../store";
-import { ActionLogEntry, OnboardingRecord } from "../types";
+import { OnboardingRecord } from "../types";
 
 export const onboardingsRouter = Router();
 
@@ -37,7 +39,8 @@ function sseWrite(res: import("express").Response, event: string, data: unknown)
 async function streamGeneration(
   res: import("express").Response,
   args: NarrativeArgs,
-  buildRecord: (outcome: NarrativeOutcome, events: ProgressEvent[]) => OnboardingRecord
+  buildRecord: (outcome: NarrativeOutcome, events: ProgressEvent[]) => OnboardingRecord,
+  onError: (error: string, events: ProgressEvent[]) => void
 ): Promise<void> {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -57,8 +60,10 @@ async function streamGeneration(
     const record = buildRecord(narrativeOutcome, collectedEvents);
     sseWrite(res, "done", record);
   } catch (err) {
+    const error = err instanceof Error ? err.message : "Unable to generate onboarding";
+    onError(error, collectedEvents);
     try {
-      sseWrite(res, "error", { error: err instanceof Error ? err.message : "Unable to generate onboarding" });
+      sseWrite(res, "error", { error });
     } finally {
       res.end();
     }
@@ -75,6 +80,15 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
+  if (startDate) {
+    try {
+      computeApprovalStatus(startDate);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+  }
+
   // Validate + build the deterministic parts BEFORE switching to a streaming
   // response, so a bad profile/project id still gets a normal 400 JSON error
   // rather than a malformed SSE stream (headers can't change once sent).
@@ -88,54 +102,64 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
-  await streamGeneration(res, { employeeName, employeeEmail, profileId, projectId }, (narrativeOutcome, events) => {
-    const creationTimestamp = new Date().toISOString();
-    const actionLog: ActionLogEntry = narrativeOutcome.ok
-      ? {
-          id: crypto.randomUUID(),
-          timestamp: creationTimestamp,
-          actor: "system",
-          type: "status_change",
-          message: "Plan generated successfully",
-          toStatus: "draft",
-        }
-      : {
-          id: crypto.randomUUID(),
-          timestamp: creationTimestamp,
-          actor: "system",
-          type: "generation_failure",
-          message: narrativeOutcome.error,
-          toStatus: "blocked",
-        };
+  const creationTimestamp = new Date().toISOString();
+  const recordId = crypto.randomUUID();
+  const initialRecord: OnboardingRecord = {
+    id: recordId,
+    employeeName,
+    employeeEmail,
+    profileId,
+    projectId,
+    startDate: startDate || undefined,
+    buddyEmail: buddyEmail || undefined,
+    seniority: seniority || undefined,
+    location: location || undefined,
+    notes: notes || undefined,
+    createdAt: creationTimestamp,
+    status: "blocked",
+    plan,
+    narrative: null,
+    narrativeError: "Generation in progress",
+    events: [],
+    actionLog: [
+      {
+        id: crypto.randomUUID(),
+        timestamp: creationTimestamp,
+        actor: "system",
+        type: "status_change",
+        message: "Generation in progress",
+        toStatus: "blocked",
+      },
+    ],
+    profile,
+    project,
+  };
 
-    const record: OnboardingRecord = {
-      id: crypto.randomUUID(),
-      employeeName,
-      employeeEmail,
-      profileId,
-      projectId,
-      startDate: startDate || undefined,
-      buddyEmail: buddyEmail || undefined,
-      seniority: seniority || undefined,
-      location: location || undefined,
-      notes: notes || undefined,
-      createdAt: creationTimestamp,
-      status: narrativeOutcome.ok ? "draft" : "blocked",
-      plan,
-      narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
-      narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
-      events,
-      actionLog: [actionLog],
-      profile,
-      project,
-    };
-    saveOnboarding(record);
-    return record;
-  });
+  try {
+    saveOnboarding(initialRecord);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to save onboarding" });
+    return;
+  }
+
+  await streamGeneration(
+    res,
+    { employeeName, employeeEmail, profileId, projectId },
+    (narrativeOutcome, events) => finalizeGeneration(recordId, plan, narrativeOutcome, events),
+    (error, events) => {
+      finalizeGeneration(recordId, plan, { ok: false, error }, events);
+    }
+  );
 });
 
 onboardingsRouter.post("/:id/retry", async (req, res) => {
-  const existing = getOnboarding(req.params.id);
+  let existing: OnboardingRecord | undefined;
+  try {
+    existing = getOnboarding(req.params.id);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to load onboarding" });
+    return;
+  }
   if (!existing) {
     res.status(404).json({ error: `Onboarding '${req.params.id}' not found` });
     return;
@@ -161,28 +185,9 @@ onboardingsRouter.post("/:id/retry", async (req, res) => {
       profileId: existing.profileId,
       projectId: existing.projectId,
     },
-    (narrativeOutcome, events) => {
-      const timestamp = new Date().toISOString();
-      const actionLog: ActionLogEntry = {
-        id: crypto.randomUUID(),
-        timestamp,
-        actor: "manager",
-        type: "retry",
-        fromStatus: "blocked",
-        toStatus: narrativeOutcome.ok ? "draft" : "blocked",
-        message: narrativeOutcome.ok ? "Retry succeeded" : narrativeOutcome.error,
-      };
-      const updated: OnboardingRecord = {
-        ...existing,
-        status: narrativeOutcome.ok ? "draft" : "blocked",
-        plan,
-        narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
-        narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
-        events,
-        actionLog: [...existing.actionLog, actionLog],
-      };
-      updateOnboarding(updated);
-      return updated;
+    (narrativeOutcome, events) => finalizeRetry(req.params.id, plan, narrativeOutcome, events),
+    (error, events) => {
+      finalizeRetry(req.params.id, plan, { ok: false, error }, events);
     }
   );
 });
@@ -191,7 +196,7 @@ onboardingsRouter.post("/:id/complete", (req, res) => {
   try {
     const result = markCompleted(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);
@@ -204,7 +209,7 @@ onboardingsRouter.post("/:id/approve", (req, res) => {
   try {
     const result = approveOnboarding(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);
@@ -217,7 +222,7 @@ onboardingsRouter.post("/:id/send-for-approval", (req, res) => {
   try {
     const result = sendForApproval(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);

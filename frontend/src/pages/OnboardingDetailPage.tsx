@@ -51,12 +51,29 @@ function buildProgressEntries(record: OnboardingRecord): ProgressEntry[] {
     .filter((entry) => entry.toStatus !== undefined)
     .map((entry) => ({ status: entry.toStatus as OnboardingStatus, timestamp: entry.timestamp }));
 
-  const last = entries[entries.length - 1];
-  if (record.status === "in_progress" && last?.status === "ready_for_day_1" && record.startDate) {
-    entries.push({ status: "in_progress", timestamp: record.startDate });
+  const hasLoggedInProgress = entries.some((entry) => entry.status === "in_progress");
+  const hasReadyForDayOne = entries.some((entry) => entry.status === "ready_for_day_1");
+  if (
+    (record.status === "in_progress" || record.status === "completed") &&
+    !hasLoggedInProgress &&
+    hasReadyForDayOne &&
+    record.startDate
+  ) {
+    const syntheticEntry = { status: "in_progress" as const, timestamp: record.startDate };
+    const completedIndex = entries.findIndex((entry) => entry.status === "completed");
+    if (completedIndex === -1) {
+      entries.push(syntheticEntry);
+    } else {
+      entries.splice(completedIndex, 0, syntheticEntry);
+    }
   }
 
   return entries;
+}
+
+function formatProgressTimestamp(timestamp: string): string {
+  const value = /^\d{4}-\d{2}-\d{2}$/.test(timestamp) ? `${timestamp}T00:00:00` : timestamp;
+  return new Date(value).toLocaleString();
 }
 
 export function OnboardingDetailPage() {
@@ -228,7 +245,7 @@ export function OnboardingDetailPage() {
           {progressEntries.map((entry, i) => (
             <div key={i} className="flex items-center gap-3">
               <span className="text-body-medium text-on-surface-variant">
-                {new Date(entry.timestamp).toLocaleString()}
+                {formatProgressTimestamp(entry.timestamp)}
               </span>
               <Chip tone={statusTone(entry.status)}>{entry.status}</Chip>
             </div>
@@ -292,7 +309,7 @@ ${repo.test}`}
       </Card>
 
       <Card className="mb-6">
-        <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
+        <SectionTitle>{isApprovedStatus(record.status) ? "Approved Permissions" : "Requested Permissions"}</SectionTitle>
         <p className="mb-1 text-label-large text-on-surface-variant">AWS</p>
         <BulletList items={profile.permissions.aws} />
         <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Repository access</p>

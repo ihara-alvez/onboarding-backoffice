@@ -79,31 +79,36 @@ async function streamRequest<T>(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    // SSE frames are separated by a blank line; each frame has "event: X" and "data: Y" lines.
-    const frames = buffer.split("\n\n");
-    buffer = frames.pop() ?? "";
+      // SSE frames are separated by a blank line; each frame has "event: X" and "data: Y" lines.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
 
-    for (const frame of frames) {
-      const eventLine = frame.split("\n").find((l) => l.startsWith("event: "));
-      const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
-      if (!eventLine || !dataLine) continue;
-      const eventName = eventLine.slice("event: ".length).trim();
-      const data = JSON.parse(dataLine.slice("data: ".length));
+      for (const frame of frames) {
+        const eventLine = frame.split("\n").find((l) => l.startsWith("event: "));
+        const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+        if (!eventLine || !dataLine) continue;
+        const eventName = eventLine.slice("event: ".length).trim();
+        const data = JSON.parse(dataLine.slice("data: ".length));
 
-      if (eventName === "progress") {
-        onProgress(data as ProgressEvent);
-      } else if (eventName === "done") {
-        return data as T;
-      } else if (eventName === "error") {
-        const errorData = data as { error?: unknown };
-        throw new Error(typeof errorData.error === "string" ? errorData.error : "Unable to complete streaming request");
+        if (eventName === "progress") {
+          onProgress(data as ProgressEvent);
+        } else if (eventName === "done") {
+          return data as T;
+        } else if (eventName === "error") {
+          const errorData = data as { error?: unknown };
+          throw new Error(typeof errorData.error === "string" ? errorData.error : "Unable to complete streaming request");
+        }
       }
     }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
 
   throw new Error("Stream ended without a completion event");
