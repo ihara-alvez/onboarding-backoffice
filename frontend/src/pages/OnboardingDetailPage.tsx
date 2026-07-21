@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { approveOnboarding, deleteOnboarding, getOnboarding } from "../api/client";
+import { approveOnboarding, deleteOnboarding, getOnboarding, sendForApproval } from "../api/client";
 import type { OnboardingRecord } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -37,6 +37,7 @@ export function OnboardingDetailPage() {
   const [record, setRecord] = useState<OnboardingRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [sendingForApproval, setSendingForApproval] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -59,6 +60,19 @@ export function OnboardingDetailPage() {
     } catch (err) {
       setError((err as Error).message);
       setApproving(false);
+    }
+  }
+
+  async function handleSendForApproval() {
+    if (!id) return;
+    setSendingForApproval(true);
+    try {
+      const updated = await sendForApproval(id);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSendingForApproval(false);
     }
   }
 
@@ -228,6 +242,11 @@ ${repo.test}`}
 
       <div className="flex items-center gap-3">
         {record.status === "draft" && (
+          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || deleting}>
+            {sendingForApproval ? "Sending..." : "Send for approval"}
+          </Button>
+        )}
+        {record.status === "pending_approval" && (
           <Button onClick={handleApprove} disabled={approving || deleting}>
             {approving ? "Approving..." : "Approve & send to employee"}
           </Button>
@@ -237,7 +256,7 @@ ${repo.test}`}
           aria-label="Delete onboarding"
           title="Delete onboarding"
           onClick={handleDelete}
-          disabled={approving || deleting}
+          disabled={sendingForApproval || approving || deleting}
         >
           <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
         </IconButton>

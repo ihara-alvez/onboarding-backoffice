@@ -105,6 +105,12 @@ export function approveOnboarding(id: string): Promise<OnboardingRecord> {
   );
 }
 
+export function sendForApproval(id: string): Promise<OnboardingRecord> {
+  return fetch(`/api/onboardings/${id}/send-for-approval`, { method: "POST" }).then((r) =>
+    handle<OnboardingRecord>(r)
+  );
+}
+
 export async function deleteOnboarding(id: string): Promise<void> {
   const res = await fetch(`/api/onboardings/${id}`, { method: "DELETE" });
   if (!res.ok) {

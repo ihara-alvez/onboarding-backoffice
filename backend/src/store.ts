@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { ActionLogEntry, OnboardingRecord, OnboardingStatus } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "..", "data");
@@ -68,10 +69,65 @@ export function saveOnboarding(record: OnboardingRecord): void {
   writeAll(all);
 }
 
-export function approveOnboarding(id: string): OnboardingRecord | undefined {
+export type StoreResult =
+  | { ok: true; record: OnboardingRecord }
+  | { ok: false; error: string };
+
+function appendStatusChange(
+  record: OnboardingRecord,
+  fromStatus: OnboardingStatus,
+  toStatus: OnboardingStatus,
+  message: string
+): OnboardingRecord {
+  return {
+    ...record,
+    status: toStatus,
+    actionLog: [
+      ...record.actionLog,
+      {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        actor: "manager",
+        type: "status_change",
+        fromStatus,
+        toStatus,
+        message,
+      },
+    ],
+  };
+}
+
+export function sendForApproval(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return undefined;
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (all[idx].status !== "draft") {
+    return { ok: false, error: "Cannot send for approval: onboarding is not a draft" };
+  }
+  all[idx] = appendStatusChange(all[idx], "draft", "pending_approval", "Sent for approval");
+  writeAll(all);
+  return { ok: true, record: all[idx] };
+}
+
+export function revertToDraft(id: string, reason: string): StoreResult {
+  const all = readAll();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (all[idx].status !== "pending_approval") {
+    return { ok: false, error: "Cannot revert to draft: onboarding is not pending approval" };
+  }
+  all[idx] = appendStatusChange(all[idx], "pending_approval", "draft", reason);
+  writeAll(all);
+  return { ok: true, record: all[idx] };
+}
+
+export function approveOnboarding(id: string): StoreResult {
+  const all = readAll();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (all[idx].status !== "pending_approval") {
+    return { ok: false, error: "Cannot approve: plan changed, please review again" };
+  }
   const now = new Date().toISOString();
   all[idx] = {
     ...all[idx],
@@ -82,7 +138,7 @@ export function approveOnboarding(id: string): OnboardingRecord | undefined {
     notification: { sentTo: all[idx].employeeEmail, sentAt: now, channel: "email (simulated)" },
   };
   writeAll(all);
-  return all[idx];
+  return { ok: true, record: all[idx] };
 }
 
 export function deleteOnboarding(id: string): boolean {

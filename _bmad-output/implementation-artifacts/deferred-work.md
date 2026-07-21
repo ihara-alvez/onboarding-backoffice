@@ -19,3 +19,8 @@
 ## Deferred from: code review of 1-1-six-state-status-model-migration-log-schema (2026-07-21)
 
 - Handle a valid JSON store whose root value is not an array. This is pre-existing behavior: `readAll()` already assumed an array and would fail at `.map()` before Story 1.1.
+
+## Deferred from: code review of 1-3-manual-submission-for-approval-with-atomic-race-safety (2026-07-21)
+
+- Multi-process concurrent writers can still race in the JSON store; this story intentionally guarantees only single-process synchronous event-loop serialization.
+- Direct `fs.writeFileSync` persistence can be left partially written if the process crashes during a rewrite; crash-safe persistence is outside this story's atomic status-transition scope.

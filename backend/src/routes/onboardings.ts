@@ -3,7 +3,14 @@ import crypto from "crypto";
 import { getProfile, getProject } from "../catalog";
 import { buildOnboardingPlan } from "../planBuilder";
 import { runNarrative, ProgressEvent } from "../pythonBridge";
-import { listOnboardings, getOnboarding, saveOnboarding, approveOnboarding, deleteOnboarding } from "../store";
+import {
+  listOnboardings,
+  getOnboarding,
+  saveOnboarding,
+  approveOnboarding,
+  deleteOnboarding,
+  sendForApproval,
+} from "../store";
 import { ActionLogEntry, OnboardingRecord } from "../types";
 
 export const onboardingsRouter = Router();
@@ -108,17 +115,29 @@ onboardingsRouter.post("/", async (req, res) => {
 });
 
 onboardingsRouter.post("/:id/approve", (req, res) => {
-  const existing = getOnboarding(req.params.id);
-  if (!existing) {
-    res.status(404).json({ error: `Onboarding '${req.params.id}' not found` });
-    return;
+  try {
+    const result = approveOnboarding(req.params.id);
+    if (!result.ok) {
+      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      return;
+    }
+    res.json(result.record);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to approve onboarding" });
   }
-  if (existing.status !== "draft") {
-    res.json(existing);
-    return;
+});
+
+onboardingsRouter.post("/:id/send-for-approval", (req, res) => {
+  try {
+    const result = sendForApproval(req.params.id);
+    if (!result.ok) {
+      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      return;
+    }
+    res.json(result.record);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to send onboarding for approval" });
   }
-  const updated = approveOnboarding(req.params.id);
-  res.json(updated);
 });
 
 onboardingsRouter.delete("/:id", (req, res) => {
