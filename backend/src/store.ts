@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { ActionLogEntry, OnboardingRecord, OnboardingStatus } from "./types";
+import { ActionLogEntry, OnboardingRecord, OnboardingStatus, ProgressEvent } from "./types";
 
 const DATA_DIR = path.resolve(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "onboardings.json");
@@ -102,12 +102,86 @@ export function saveOnboarding(record: OnboardingRecord): void {
   writeAll(all);
 }
 
-export function updateOnboarding(record: OnboardingRecord): void {
+export function finalizeGeneration(
+  id: string,
+  plan: string,
+  outcome: { ok: true; narrative: string } | { ok: false; error: string },
+  events: ProgressEvent[]
+): OnboardingRecord {
   const all = readAll();
-  const idx = all.findIndex((candidate) => candidate.id === record.id);
-  if (idx === -1) throw new Error(`Onboarding '${record.id}' not found`);
-  all[idx] = record;
+  const idx = all.findIndex((record) => record.id === id);
+  if (idx === -1) throw new Error(`Onboarding '${id}' not found`);
+  const current = all[idx];
+  if (current.status !== "blocked") return current;
+
+  const timestamp = new Date().toISOString();
+  const entry: ActionLogEntry = outcome.ok
+    ? {
+        id: crypto.randomUUID(),
+        timestamp,
+        actor: "system",
+        type: "status_change",
+        fromStatus: "blocked",
+        toStatus: "draft",
+        message: "Plan generated successfully",
+      }
+    : {
+        id: crypto.randomUUID(),
+        timestamp,
+        actor: "system",
+        type: "generation_failure",
+        fromStatus: "blocked",
+        toStatus: "blocked",
+        message: outcome.error,
+      };
+  all[idx] = {
+    ...current,
+    status: outcome.ok ? "draft" : "blocked",
+    plan,
+    narrative: outcome.ok ? outcome.narrative : null,
+    narrativeError: outcome.ok ? undefined : outcome.error,
+    events,
+    actionLog: [...current.actionLog, entry],
+  };
   writeAll(all);
+  return all[idx];
+}
+
+export function finalizeRetry(
+  id: string,
+  plan: string,
+  outcome: { ok: true; narrative: string } | { ok: false; error: string },
+  events: ProgressEvent[]
+): OnboardingRecord {
+  const all = readAll();
+  const idx = all.findIndex((record) => record.id === id);
+  if (idx === -1) throw new Error(`Onboarding '${id}' not found`);
+  const current = all[idx];
+  const timestamp = new Date().toISOString();
+  const entry: ActionLogEntry = {
+    id: crypto.randomUUID(),
+    timestamp,
+    actor: "manager",
+    type: "retry",
+    fromStatus: "blocked",
+    toStatus: outcome.ok ? "draft" : "blocked",
+    message: outcome.ok ? "Retry succeeded" : outcome.error,
+  };
+  all[idx] = {
+    ...current,
+    ...(current.status === "blocked"
+      ? {
+          status: outcome.ok ? "draft" : "blocked",
+          plan,
+          narrative: outcome.ok ? outcome.narrative : null,
+          narrativeError: outcome.ok ? undefined : outcome.error,
+          events,
+        }
+      : {}),
+    actionLog: [...current.actionLog, entry],
+  };
+  writeAll(all);
+  return all[idx];
 }
 
 export type StoreResult =

@@ -56,7 +56,7 @@ development_status:
   1-5-manual-recovery-completion-actions: done
   1-6-requested-vs-approved-permission-labeling: done
   1-7-progress-timeline-display: done
-  1-8-full-action-log-display-immutability-guarantee: review
+  1-8-full-action-log-display-immutability-guarantee: done
   epic-1-retrospective: optional
 
   epic-2: in-progress

@@ -45,3 +45,7 @@
 ## Deferred from: code review of 1-7-progress-timeline-display (2026-07-21)
 
 - State-changing endpoints have no authorization boundary in `backend/src/routes/onboardings.ts:190-227`; authentication is pre-existing application-wide scope, not introduced by Story 1.7.
+
+## Deferred from: code review of 1-8-full-action-log-display-immutability-guarantee (2026-07-21)
+
+- Delete actions are not audited; deferred because implementing this requires cross-record audit storage beyond this story's scope.

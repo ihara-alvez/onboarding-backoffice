@@ -7,14 +7,15 @@ import {
   listOnboardings,
   getOnboarding,
   saveOnboarding,
-  updateOnboarding,
   approveOnboarding,
   deleteOnboarding,
   markCompleted,
   sendForApproval,
   computeApprovalStatus,
+  finalizeGeneration,
+  finalizeRetry,
 } from "../store";
-import { ActionLogEntry, OnboardingRecord } from "../types";
+import { OnboardingRecord } from "../types";
 
 export const onboardingsRouter = Router();
 
@@ -38,7 +39,8 @@ function sseWrite(res: import("express").Response, event: string, data: unknown)
 async function streamGeneration(
   res: import("express").Response,
   args: NarrativeArgs,
-  buildRecord: (outcome: NarrativeOutcome, events: ProgressEvent[]) => OnboardingRecord
+  buildRecord: (outcome: NarrativeOutcome, events: ProgressEvent[]) => OnboardingRecord,
+  onError: (error: string, events: ProgressEvent[]) => void
 ): Promise<void> {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -58,8 +60,10 @@ async function streamGeneration(
     const record = buildRecord(narrativeOutcome, collectedEvents);
     sseWrite(res, "done", record);
   } catch (err) {
+    const error = err instanceof Error ? err.message : "Unable to generate onboarding";
+    onError(error, collectedEvents);
     try {
-      sseWrite(res, "error", { error: err instanceof Error ? err.message : "Unable to generate onboarding" });
+      sseWrite(res, "error", { error });
     } finally {
       res.end();
     }
@@ -122,7 +126,7 @@ onboardingsRouter.post("/", async (req, res) => {
         id: crypto.randomUUID(),
         timestamp: creationTimestamp,
         actor: "system",
-        type: "generation_failure",
+        type: "status_change",
         message: "Generation in progress",
         toStatus: "blocked",
       },
@@ -138,30 +142,14 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
-  await streamGeneration(res, { employeeName, employeeEmail, profileId, projectId }, (narrativeOutcome, events) => {
-    const actionLog: ActionLogEntry = narrativeOutcome.ok
-      ? {
-          ...initialRecord.actionLog[0],
-          type: "status_change",
-          message: "Plan generated successfully",
-          toStatus: "draft",
-        }
-      : {
-          ...initialRecord.actionLog[0],
-          message: narrativeOutcome.error,
-        };
-    const record: OnboardingRecord = {
-      ...initialRecord,
-      status: narrativeOutcome.ok ? "draft" : "blocked",
-      plan,
-      narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
-      narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
-      events,
-      actionLog: [actionLog],
-    };
-    updateOnboarding(record);
-    return record;
-  });
+  await streamGeneration(
+    res,
+    { employeeName, employeeEmail, profileId, projectId },
+    (narrativeOutcome, events) => finalizeGeneration(recordId, plan, narrativeOutcome, events),
+    (error, events) => {
+      finalizeGeneration(recordId, plan, { ok: false, error }, events);
+    }
+  );
 });
 
 onboardingsRouter.post("/:id/retry", async (req, res) => {
@@ -197,28 +185,9 @@ onboardingsRouter.post("/:id/retry", async (req, res) => {
       profileId: existing.profileId,
       projectId: existing.projectId,
     },
-    (narrativeOutcome, events) => {
-      const timestamp = new Date().toISOString();
-      const actionLog: ActionLogEntry = {
-        id: crypto.randomUUID(),
-        timestamp,
-        actor: "manager",
-        type: "retry",
-        fromStatus: "blocked",
-        toStatus: narrativeOutcome.ok ? "draft" : "blocked",
-        message: narrativeOutcome.ok ? "Retry succeeded" : narrativeOutcome.error,
-      };
-      const updated: OnboardingRecord = {
-        ...existing,
-        status: narrativeOutcome.ok ? "draft" : "blocked",
-        plan,
-        narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
-        narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
-        events,
-        actionLog: [...existing.actionLog, actionLog],
-      };
-      updateOnboarding(updated);
-      return updated;
+    (narrativeOutcome, events) => finalizeRetry(req.params.id, plan, narrativeOutcome, events),
+    (error, events) => {
+      finalizeRetry(req.params.id, plan, { ok: false, error }, events);
     }
   );
 });

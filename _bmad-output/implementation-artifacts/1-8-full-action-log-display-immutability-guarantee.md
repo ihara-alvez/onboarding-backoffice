@@ -4,7 +4,7 @@ baseline_commit: 79436b0e8bb144eca3524c3b5f54c25a755419de
 
 # Story 1.8: Full Action Log Display & Immutability Guarantee
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -69,10 +69,20 @@ None — no failures encountered. Verification: `frontend/npm run build`/`lint` 
 - Each row: timestamp, capitalized actor ("Manager"/"System" — no lookup needed, per NFR4's generic-attribution design already baked into Story 1.1's schema), and the entry's `message`.
 - **Documented, deliberate scope limitation carried over from the story's Dev Notes:** delete actions are not logged and this story does not add that — `deleteOnboarding()` removes the whole record including its `actionLog`, so there is no persisted place to show a "deleted" entry for a record that no longer exists. Building cross-record audit storage for this would be scope creep beyond anything the PRD/architecture calls for.
 - AC1/AC4 (immutability) and AC5 (no entry for the read-time flip) required no new code — verified by inspection only, per the story's own framing as primarily a display + verification story.
+- Code-review fixes added store-level generation finalization so terminal outcomes are appended as new entries, failures are persisted, and concurrent generation completions merge against the latest record.
+
+### Review Findings
+
+- [x] [Review][Defer] Delete actions are not audited — AC1 explicitly requires one new Action Log entry when a delete action occurs, but `DELETE /:id` removes the entire record and its log. Deferred because it requires cross-record audit storage beyond this story's scope.
+- [x] [Review][Patch] Initial generation log entry is edited instead of appended [backend/src/routes/onboardings.ts:120] — fixed by preserving the provisional entry and appending a distinct terminal entry.
+- [x] [Review][Patch] Generation failures can leave an incomplete audit state [backend/src/routes/onboardings.ts:56] — fixed by appending a terminal failure entry when streaming or persistence fails.
+- [x] [Review][Patch] Concurrent generation writes can discard action-log entries [backend/src/routes/onboardings.ts:141, backend/src/routes/onboardings.ts:192, backend/src/store.ts:105] — fixed by finalizing against the latest stored record and appending to its current log rather than replacing a stale snapshot.
 
 ### File List
 
 - `frontend/src/pages/OnboardingDetailPage.tsx` (modified)
+- `backend/src/routes/onboardings.ts` (modified)
+- `backend/src/store.ts` (modified)
 
 ## Change Log
 
