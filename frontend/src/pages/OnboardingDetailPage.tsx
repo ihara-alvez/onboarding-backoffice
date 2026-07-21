@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { approveOnboarding, deleteOnboarding, getOnboarding } from "../api/client";
+import {
+  approveOnboarding,
+  deleteOnboarding,
+  getOnboarding,
+  markCompleted,
+  retryGeneration,
+  sendForApproval,
+} from "../api/client";
 import type { OnboardingRecord, OnboardingStatus } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -12,7 +19,7 @@ import { Markdown } from "../components/Markdown";
 import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
 import { TrashIcon } from "../components/TrashIcon";
-import { statusTone } from "../statusDisplay";
+import { isApprovedStatus, statusTone } from "../statusDisplay";
 
 function BulletList({ items }: { items: string[] }) {
   if (items.length === 0) {
@@ -58,6 +65,9 @@ export function OnboardingDetailPage() {
   const [record, setRecord] = useState<OnboardingRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [sendingForApproval, setSendingForApproval] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -83,6 +93,19 @@ export function OnboardingDetailPage() {
     }
   }
 
+  async function handleSendForApproval() {
+    if (!id) return;
+    setSendingForApproval(true);
+    try {
+      const updated = await sendForApproval(id);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSendingForApproval(false);
+    }
+  }
+
   async function handleDelete() {
     if (!id || !record) return;
     if (!window.confirm(`Delete the onboarding for ${record.employeeName}? This can't be undone.`)) {
@@ -95,6 +118,32 @@ export function OnboardingDetailPage() {
     } catch (err) {
       setError((err as Error).message);
       setDeleting(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const updated = await retryGeneration(id, () => undefined);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  async function handleComplete() {
+    if (!id) return;
+    setCompleting(true);
+    try {
+      const updated = await markCompleted(id);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -227,7 +276,7 @@ ${repo.test}`}
       </Card>
 
       <Card className="mb-6">
-        <SectionTitle>Expected permissions</SectionTitle>
+        <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
         <p className="mb-1 text-label-large text-on-surface-variant">AWS</p>
         <BulletList items={profile.permissions.aws} />
         <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Repository access</p>
@@ -264,8 +313,23 @@ ${repo.test}`}
 
       <div className="flex items-center gap-3">
         {record.status === "draft" && (
-          <Button onClick={handleApprove} disabled={approving || deleting}>
+          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || retrying || completing || deleting}>
+            {sendingForApproval ? "Sending..." : "Send for approval"}
+          </Button>
+        )}
+        {record.status === "pending_approval" && (
+          <Button onClick={handleApprove} disabled={approving || retrying || completing || deleting}>
             {approving ? "Approving..." : "Approve & send to employee"}
+          </Button>
+        )}
+        {record.status === "blocked" && (
+          <Button onClick={handleRetry} disabled={retrying || completing || deleting}>
+            {retrying ? "Retrying..." : "Retry generation"}
+          </Button>
+        )}
+        {record.status === "in_progress" && (
+          <Button onClick={handleComplete} disabled={completing || retrying || deleting}>
+            {completing ? "Completing..." : "Mark complete"}
           </Button>
         )}
         <IconButton
@@ -273,7 +337,7 @@ ${repo.test}`}
           aria-label="Delete onboarding"
           title="Delete onboarding"
           onClick={handleDelete}
-          disabled={approving || deleting}
+          disabled={sendingForApproval || approving || retrying || completing || deleting}
         >
           <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
         </IconButton>

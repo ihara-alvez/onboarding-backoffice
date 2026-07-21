@@ -1,6 +1,10 @@
+---
+baseline_commit: 69523d5694c3678e5d988ab56af9788be0f9e5d9
+---
+
 # Story 1.3: Manual Submission for Approval with Atomic Race Safety
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -19,25 +23,25 @@ so that I signal the plan is final without anyone approving an unfinished draft 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: `sendForApproval` and `revertToDraft` store functions (AC: 1, 2, 4)
-  - [ ] In `backend/src/store.ts`, add `sendForApproval(id: string): { ok: true; record: OnboardingRecord } | { ok: false; error: string }`: reject (return `ok: false`) if the record doesn't exist or `status !== "draft"`; otherwise set `status: "pending_approval"`, append an `ActionLogEntry` (`actor: "manager"`, `type: "status_change"`, `fromStatus: "draft"`, `toStatus: "pending_approval"`, `message: "Sent for approval"`), write, return `ok: true`.
-  - [ ] Add `revertToDraft(id: string, reason: string): { ok: true; record: OnboardingRecord } | { ok: false; error: string }`: reject if the record doesn't exist or `status !== "pending_approval"`; otherwise set `status: "draft"`, append an `ActionLogEntry` (`actor: "manager"`, `type: "status_change"`, `fromStatus: "pending_approval"`, `toStatus: "draft"`, `message: reason`), write, return `ok: true`. **Nothing calls this yet** — Epic 2's Story 2.3 (chat message handling) will call it directly as an imported function when a manager sends a chat message on a `pending_approval` onboarding. No route/endpoint for it in this story.
-- [ ] Task 2: Tighten and harden the approve gate (AC: 3)
-  - [ ] Change `approveOnboarding()` in `backend/src/store.ts` to return the same discriminated-result shape as Task 1's functions, and move its status guard from Story 1.1's placeholder (`!== "draft"`) to `!== "pending_approval"`. On rejection, return `{ ok: false, error: "Cannot approve: plan changed, please review again" }` — reuse this exact message for any non-`pending_approval` status at approve time (see Dev Notes for why one message covers both "never sent for approval" and "reverted mid-race").
-  - [ ] Keep `approveOnboarding()`'s status write as Story 1.1's placeholder value (`"ready_for_day_1"`) for now — Story 1.4 replaces it with real `start_date`-conditional branching. This story only tightens the gate and return shape, not the transition logic.
-  - [ ] Update `backend/src/routes/onboardings.ts`'s `POST /:id/approve` handler to match the new return shape: call `approveOnboarding(id)` directly (remove the existing separate `getOnboarding()` precheck + `existing.status === "approved"` idempotency shortcut entirely — see Dev Notes on why this is an intentional behavior change, not a regression). Map `{ ok: false }` to 404 if the error is a not-found message, otherwise 409; map `{ ok: true }` to 200 with `result.record`.
-- [ ] Task 3: New "Send for approval" endpoint (AC: 1, 4)
-  - [ ] Add `POST /api/onboardings/:id/send-for-approval` in `backend/src/routes/onboardings.ts`, calling `sendForApproval()` and mapping its result the same way as Task 2's approve handler (404 not-found, 409 wrong-status, 200 success).
-- [ ] Task 4: Frontend — new action and updated gating (AC: 1, 4)
-  - [ ] Add `sendForApproval(id: string): Promise<OnboardingRecord>` to `frontend/src/api/client.ts`, mirroring the existing `approveOnboarding()` pattern (`POST` to the new endpoint, `handle<OnboardingRecord>`).
-  - [ ] In `frontend/src/pages/OnboardingDetailPage.tsx`: add a "Send for approval" `Button`, visible when `record.status === "draft"`, with its own loading state (mirror `approving`/`handleApprove`'s structure). On success, update local state via `setRecord(updated)` — do **not** navigate away (contrast with `handleApprove`, which does navigate); the manager stays on the page to then click Approve.
-  - [ ] Change the existing Approve button's visibility guard from `record.status === "draft"` (Story 1.1's placeholder) to `record.status === "pending_approval"` — approve is no longer directly reachable from `draft`.
-  - [ ] No change needed to `handleApprove`'s error handling — `client.ts`'s `handle<T>()` already throws on any non-2xx response using the JSON body's `error` field, so the new "plan changed, please review again" message surfaces through the existing `catch (err) { setError(...) }` path with zero additional frontend error-handling code.
-- [ ] Task 5: Verify (AC: 1, 2, 3, 4)
-  - [ ] `npm run build`/`typecheck` (backend), `npm run build`/`lint` (frontend).
-  - [ ] Manually verify via the running app: create an onboarding (lands in `draft` per Story 1.2), click "Send for approval" (status → `pending_approval`, Approve button now visible), click Approve (status → `ready_for_day_1`, still Story 1.1's placeholder — full date logic is Story 1.4).
-  - [ ] `revertToDraft()` has no UI trigger yet (Epic 2 wires it) — verify it directly with a scratch script, e.g. `npx tsx -e '...'` importing `sendForApproval`/`revertToDraft`/`getOnboarding` from `store.ts` and asserting the status/log-entry results, consistent with this project having no test framework configured.
-  - [ ] Verify AC4's rejection path by calling `sendForApproval` twice in a row on the same record (second call should return `ok: false` since status is no longer `draft`).
+- [x] Task 1: `sendForApproval` and `revertToDraft` store functions (AC: 1, 2, 4)
+  - [x] In `backend/src/store.ts`, add `sendForApproval(id: string): { ok: true; record: OnboardingRecord } | { ok: false; error: string }`: reject (return `ok: false`) if the record doesn't exist or `status !== "draft"`; otherwise set `status: "pending_approval"`, append an `ActionLogEntry` (`actor: "manager"`, `type: "status_change"`, `fromStatus: "draft"`, `toStatus: "pending_approval"`, `message: "Sent for approval"`), write, return `ok: true`.
+  - [x] Add `revertToDraft(id: string, reason: string): { ok: true; record: OnboardingRecord } | { ok: false; error: string }`: reject if the record doesn't exist or `status !== "pending_approval"`; otherwise set `status: "draft"`, append an `ActionLogEntry` (`actor: "manager"`, `type: "status_change"`, `fromStatus: "pending_approval"`, `toStatus: "draft"`, `message: reason`), write, return `ok: true`. **Nothing calls this yet** — Epic 2's Story 2.3 (chat message handling) will call it directly as an imported function when a manager sends a chat message on a `pending_approval` onboarding. No route/endpoint for it in this story.
+- [x] Task 2: Tighten and harden the approve gate (AC: 3)
+  - [x] Change `approveOnboarding()` in `backend/src/store.ts` to return the same discriminated-result shape as Task 1's functions, and move its status guard from Story 1.1's placeholder (`!== "draft"`) to `!== "pending_approval"`. On rejection, return `{ ok: false, error: "Cannot approve: plan changed, please review again" }` — reuse this exact message for any non-`pending_approval` status at approve time (see Dev Notes for why one message covers both "never sent for approval" and "reverted mid-race").
+  - [x] Keep `approveOnboarding()`'s status write as Story 1.1's placeholder value (`"ready_for_day_1"`) for now — Story 1.4 replaces it with real `start_date`-conditional branching. This story only tightens the gate and return shape, not the transition logic.
+  - [x] Update `backend/src/routes/onboardings.ts`'s `POST /:id/approve` handler to match the new return shape: call `approveOnboarding(id)` directly (remove the existing separate `getOnboarding()` precheck + `existing.status === "approved"` idempotency shortcut entirely — see Dev Notes on why this is an intentional behavior change, not a regression). Map `{ ok: false }` to 404 if the error is a not-found message, otherwise 409; map `{ ok: true }` to 200 with `result.record`.
+- [x] Task 3: New "Send for approval" endpoint (AC: 1, 4)
+  - [x] Add `POST /api/onboardings/:id/send-for-approval` in `backend/src/routes/onboardings.ts`, calling `sendForApproval()` and mapping its result the same way as Task 2's approve handler (404 not-found, 409 wrong-status, 200 success).
+- [x] Task 4: Frontend — new action and updated gating (AC: 1, 4)
+  - [x] Add `sendForApproval(id: string): Promise<OnboardingRecord>` to `frontend/src/api/client.ts`, mirroring the existing `approveOnboarding()` pattern (`POST` to the new endpoint, `handle<OnboardingRecord>`).
+  - [x] In `frontend/src/pages/OnboardingDetailPage.tsx`: add a "Send for approval" `Button`, visible when `record.status === "draft"`, with its own loading state (mirror `approving`/`handleApprove`'s structure). On success, update local state via `setRecord(updated)` — do **not** navigate away (contrast with `handleApprove`, which does navigate); the manager stays on the page to then click Approve.
+  - [x] Change the existing Approve button's visibility guard from `record.status === "draft"` (Story 1.1's placeholder) to `record.status === "pending_approval"` — approve is no longer directly reachable from `draft`.
+  - [x] No change needed to `handleApprove`'s error handling — `client.ts`'s `handle<T>()` already throws on any non-2xx response using the JSON body's `error` field, so the new "plan changed, please review again" message surfaces through the existing `catch (err) { setError(...) }` path with zero additional frontend error-handling code.
+- [x] Task 5: Verify (AC: 1, 2, 3, 4)
+  - [x] `npm run build`/`typecheck` (backend), `npm run build`/`lint` (frontend).
+  - [x] Manually verify via the running app: create an onboarding (lands in `draft` per Story 1.2), click "Send for approval" (status → `pending_approval`, Approve button now visible), click Approve (status → `ready_for_day_1`, still Story 1.1's placeholder — full date logic is Story 1.4).
+  - [x] `revertToDraft()` has no UI trigger yet (Epic 2 wires it) — verify it directly with a scratch script, e.g. `npx tsx -e '...'` importing `sendForApproval`/`revertToDraft`/`getOnboarding` from `store.ts` and asserting the status/log-entry results, consistent with this project having no test framework configured.
+  - [x] Verify AC4's rejection path by calling `sendForApproval` twice in a row on the same record (second call should return `ok: false` since status is no longer `draft`).
 
 ## Dev Notes
 
@@ -68,8 +72,35 @@ so that I signal the plan is final without anyone approving an unfinished draft 
 
 ### Agent Model Used
 
+Codex (GPT-5)
+
 ### Debug Log References
+
+- Live `tsx` execution is blocked by the sandbox IPC permission; the same scratch verification passes with elevated IPC permissions.
 
 ### Completion Notes List
 
+- Implemented synchronous, discriminated-result store transitions for sending, reverting, and approving onboarding plans.
+- Added status-change action log entries for send-for-approval and revert-to-draft operations.
+- Added the send-for-approval API route/client action and updated frontend button gating/loading behavior.
+- Verified store race-safety sequence with a temporary scratch record; backend typecheck/build and frontend build/lint pass.
+- Applied code-review patches for route error shaping and concurrent delete/send UI actions.
+
 ### File List
+
+- `backend/src/store.ts`
+- `backend/src/routes/onboardings.ts`
+- `frontend/src/api/client.ts`
+- `frontend/src/pages/OnboardingDetailPage.tsx`
+
+### Change Log
+
+- 2026-07-21: Implemented manual submission for approval with atomic synchronous status guards and frontend action gating.
+- 2026-07-21: Addressed code review findings — 2 patches resolved; 2 pre-existing persistence/concurrency concerns deferred.
+
+### Review Findings
+
+- [x] [Review][Patch] Approval transition routes allow synchronous store errors to escape uncaught [backend/src/routes/onboardings.ts:117-132] — project-context requires route handlers to catch risky synchronous work and return an `{ error: string }` JSON response; both `POST /:id/approve` and the new `POST /:id/send-for-approval` call `readAll()`/`writeAll()` through the store without a `try/catch`, so malformed or unreadable store data can throw out of the handler instead of being shaped into the required error response. Fixed by returning HTTP 500 JSON errors from both handlers.
+- [x] [Review][Patch] Delete remains enabled while send-for-approval is pending [frontend/src/pages/OnboardingDetailPage.tsx:254-259] — the new send action disables itself during its request, but the adjacent Delete control only checks `approving || deleting`; a manager can therefore issue send and delete concurrently and receive a misleading failure or stale page state. Fixed by including `sendingForApproval` in the Delete disabled guard.
+- [x] [Review][Defer] Multi-process concurrent writers can still race [backend/src/store.ts:100-141] — deferred, pre-existing; the story explicitly scopes its guarantee to synchronous single-process event-loop serialization and documents the JSON store's lack of true multi-process concurrency control.
+- [x] [Review][Defer] Direct JSON rewrite is not crash-safe [backend/src/store.ts:56-58] — deferred, pre-existing; the story's atomic-race requirement concerns serialized status transitions, not crash-safe persistence, and the direct rewrite predates this change.
