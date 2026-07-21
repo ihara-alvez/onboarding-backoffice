@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { approveOnboarding, deleteOnboarding, getOnboarding, sendForApproval } from "../api/client";
+import {
+  approveOnboarding,
+  deleteOnboarding,
+  getOnboarding,
+  markCompleted,
+  retryGeneration,
+  sendForApproval,
+} from "../api/client";
 import type { OnboardingRecord } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -38,6 +45,8 @@ export function OnboardingDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [sendingForApproval, setSendingForApproval] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -88,6 +97,32 @@ export function OnboardingDetailPage() {
     } catch (err) {
       setError((err as Error).message);
       setDeleting(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const updated = await retryGeneration(id, () => undefined);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  async function handleComplete() {
+    if (!id) return;
+    setCompleting(true);
+    try {
+      const updated = await markCompleted(id);
+      setRecord(updated);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -242,13 +277,23 @@ ${repo.test}`}
 
       <div className="flex items-center gap-3">
         {record.status === "draft" && (
-          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || deleting}>
+          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || retrying || completing || deleting}>
             {sendingForApproval ? "Sending..." : "Send for approval"}
           </Button>
         )}
         {record.status === "pending_approval" && (
-          <Button onClick={handleApprove} disabled={approving || deleting}>
+          <Button onClick={handleApprove} disabled={approving || retrying || completing || deleting}>
             {approving ? "Approving..." : "Approve & send to employee"}
+          </Button>
+        )}
+        {record.status === "blocked" && (
+          <Button onClick={handleRetry} disabled={retrying || completing || deleting}>
+            {retrying ? "Retrying..." : "Retry generation"}
+          </Button>
+        )}
+        {record.status === "in_progress" && (
+          <Button onClick={handleComplete} disabled={completing || retrying || deleting}>
+            {completing ? "Completing..." : "Mark complete"}
           </Button>
         )}
         <IconButton
@@ -256,7 +301,7 @@ ${repo.test}`}
           aria-label="Delete onboarding"
           title="Delete onboarding"
           onClick={handleDelete}
-          disabled={sendingForApproval || approving || deleting}
+          disabled={sendingForApproval || approving || retrying || completing || deleting}
         >
           <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
         </IconButton>

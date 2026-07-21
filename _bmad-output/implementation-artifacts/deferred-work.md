@@ -24,3 +24,8 @@
 
 - Multi-process concurrent writers can still race in the JSON store; this story intentionally guarantees only single-process synchronous event-loop serialization.
 - Direct `fs.writeFileSync` persistence can be left partially written if the process crashes during a rewrite; crash-safe persistence is outside this story's atomic status-transition scope.
+
+## Deferred from: code review of 1-5-manual-recovery-completion-actions (2026-07-21)
+
+- Retry requests can race because the local JSON store has no concurrency control; this remains outside the single-user demo scope.
+- Retry and completion routes have no authentication/authorization guard because the application has no authentication layer; existing state-changing routes use the same trust model.

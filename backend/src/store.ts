@@ -98,6 +98,14 @@ export function saveOnboarding(record: OnboardingRecord): void {
   writeAll(all);
 }
 
+export function updateOnboarding(record: OnboardingRecord): void {
+  const all = readAll();
+  const idx = all.findIndex((candidate) => candidate.id === record.id);
+  if (idx === -1) throw new Error(`Onboarding '${record.id}' not found`);
+  all[idx] = record;
+  writeAll(all);
+}
+
 export type StoreResult =
   | { ok: true; record: OnboardingRecord }
   | { ok: false; error: string };
@@ -180,6 +188,19 @@ export function approveOnboarding(id: string): StoreResult {
       },
     ],
   };
+  writeAll(all);
+  return { ok: true, record: all[idx] };
+}
+
+export function markCompleted(id: string): StoreResult {
+  const all = readAll();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  const fromStatus = computeEffectiveStatus(all[idx]);
+  if (fromStatus !== "in_progress") {
+    return { ok: false, error: "Cannot mark complete: onboarding is not in progress" };
+  }
+  all[idx] = appendStatusChange(all[idx], fromStatus, "completed", "Marked complete");
   writeAll(all);
   return { ok: true, record: all[idx] };
 }

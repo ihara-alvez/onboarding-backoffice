@@ -2,13 +2,15 @@ import { Router } from "express";
 import crypto from "crypto";
 import { getProfile, getProject } from "../catalog";
 import { buildOnboardingPlan } from "../planBuilder";
-import { runNarrative, ProgressEvent } from "../pythonBridge";
+import { runNarrative, NarrativeArgs, NarrativeOutcome, ProgressEvent } from "../pythonBridge";
 import {
   listOnboardings,
   getOnboarding,
   saveOnboarding,
+  updateOnboarding,
   approveOnboarding,
   deleteOnboarding,
+  markCompleted,
   sendForApproval,
 } from "../store";
 import { ActionLogEntry, OnboardingRecord } from "../types";
@@ -32,6 +34,39 @@ function sseWrite(res: import("express").Response, event: string, data: unknown)
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+async function streamGeneration(
+  res: import("express").Response,
+  args: NarrativeArgs,
+  buildRecord: (outcome: NarrativeOutcome, events: ProgressEvent[]) => OnboardingRecord
+): Promise<void> {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const collectedEvents: ProgressEvent[] = [];
+  const onEvent = (event: ProgressEvent) => {
+    collectedEvents.push(event);
+    sseWrite(res, "progress", event);
+  };
+
+  try {
+    const narrativeOutcome = await runNarrative(args, onEvent);
+    const record = buildRecord(narrativeOutcome, collectedEvents);
+    sseWrite(res, "done", record);
+  } catch (err) {
+    try {
+      sseWrite(res, "error", { error: err instanceof Error ? err.message : "Unable to generate onboarding" });
+    } finally {
+      res.end();
+    }
+    return;
+  }
+  res.end();
+}
+
 onboardingsRouter.post("/", async (req, res) => {
   const { employeeName, employeeEmail, profileId, projectId, startDate, buddyEmail, seniority, location, notes } =
     req.body ?? {};
@@ -53,65 +88,116 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
+  await streamGeneration(res, { employeeName, employeeEmail, profileId, projectId }, (narrativeOutcome, events) => {
+    const creationTimestamp = new Date().toISOString();
+    const actionLog: ActionLogEntry = narrativeOutcome.ok
+      ? {
+          id: crypto.randomUUID(),
+          timestamp: creationTimestamp,
+          actor: "system",
+          type: "status_change",
+          message: "Plan generated successfully",
+          toStatus: "draft",
+        }
+      : {
+          id: crypto.randomUUID(),
+          timestamp: creationTimestamp,
+          actor: "system",
+          type: "generation_failure",
+          message: narrativeOutcome.error,
+          toStatus: "blocked",
+        };
+
+    const record: OnboardingRecord = {
+      id: crypto.randomUUID(),
+      employeeName,
+      employeeEmail,
+      profileId,
+      projectId,
+      startDate: startDate || undefined,
+      buddyEmail: buddyEmail || undefined,
+      seniority: seniority || undefined,
+      location: location || undefined,
+      notes: notes || undefined,
+      createdAt: creationTimestamp,
+      status: narrativeOutcome.ok ? "draft" : "blocked",
+      plan,
+      narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
+      narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
+      events,
+      actionLog: [actionLog],
+      profile,
+      project,
+    };
+    saveOnboarding(record);
+    return record;
   });
+});
 
-  const collectedEvents: ProgressEvent[] = [];
-  const onEvent = (event: ProgressEvent) => {
-    collectedEvents.push(event);
-    sseWrite(res, "progress", event);
-  };
+onboardingsRouter.post("/:id/retry", async (req, res) => {
+  const existing = getOnboarding(req.params.id);
+  if (!existing) {
+    res.status(404).json({ error: `Onboarding '${req.params.id}' not found` });
+    return;
+  }
+  if (existing.status !== "blocked") {
+    res.status(409).json({ error: "Cannot retry generation: onboarding is not blocked" });
+    return;
+  }
 
-  // Isolate the risky agent call: onboarding creation must succeed even if this fails/times out.
-  const narrativeOutcome = await runNarrative({ employeeName, employeeEmail, profileId, projectId }, onEvent);
-  const creationTimestamp = new Date().toISOString();
-  const actionLog: ActionLogEntry = narrativeOutcome.ok
-    ? {
+  let plan: string;
+  try {
+    plan = buildOnboardingPlan(existing.employeeName, existing.employeeEmail, existing.profile, existing.project);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+    return;
+  }
+
+  await streamGeneration(
+    res,
+    {
+      employeeName: existing.employeeName,
+      employeeEmail: existing.employeeEmail,
+      profileId: existing.profileId,
+      projectId: existing.projectId,
+    },
+    (narrativeOutcome, events) => {
+      const timestamp = new Date().toISOString();
+      const actionLog: ActionLogEntry = {
         id: crypto.randomUUID(),
-        timestamp: creationTimestamp,
-        actor: "system",
-        type: "status_change",
-        message: "Plan generated successfully",
-        toStatus: "draft",
-      }
-    : {
-        id: crypto.randomUUID(),
-        timestamp: creationTimestamp,
-        actor: "system",
-        type: "generation_failure",
-        message: narrativeOutcome.error,
-        toStatus: "blocked",
+        timestamp,
+        actor: "manager",
+        type: "retry",
+        fromStatus: "blocked",
+        toStatus: narrativeOutcome.ok ? "draft" : "blocked",
+        message: narrativeOutcome.ok ? "Retry succeeded" : narrativeOutcome.error,
       };
+      const updated: OnboardingRecord = {
+        ...existing,
+        status: narrativeOutcome.ok ? "draft" : "blocked",
+        plan,
+        narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
+        narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
+        events,
+        actionLog: [...existing.actionLog, actionLog],
+      };
+      updateOnboarding(updated);
+      return updated;
+    }
+  );
+});
 
-  const record: OnboardingRecord = {
-    id: crypto.randomUUID(),
-    employeeName,
-    employeeEmail,
-    profileId,
-    projectId,
-    startDate: startDate || undefined,
-    buddyEmail: buddyEmail || undefined,
-    seniority: seniority || undefined,
-    location: location || undefined,
-    notes: notes || undefined,
-    createdAt: creationTimestamp,
-    status: narrativeOutcome.ok ? "draft" : "blocked",
-    plan,
-    narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
-    narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
-    events: collectedEvents,
-    actionLog: [actionLog],
-    profile,
-    project,
-  };
-
-  saveOnboarding(record);
-  sseWrite(res, "done", record);
-  res.end();
+onboardingsRouter.post("/:id/complete", (req, res) => {
+  try {
+    const result = markCompleted(req.params.id);
+    if (!result.ok) {
+      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      return;
+    }
+    res.json(result.record);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to mark onboarding complete" });
+  }
 });
 
 onboardingsRouter.post("/:id/approve", (req, res) => {
