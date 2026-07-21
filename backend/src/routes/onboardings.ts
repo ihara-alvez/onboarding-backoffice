@@ -4,7 +4,7 @@ import { getProfile, getProject } from "../catalog";
 import { buildOnboardingPlan } from "../planBuilder";
 import { runNarrative, ProgressEvent } from "../pythonBridge";
 import { listOnboardings, getOnboarding, saveOnboarding, approveOnboarding, deleteOnboarding } from "../store";
-import { OnboardingRecord } from "../types";
+import { ActionLogEntry, OnboardingRecord } from "../types";
 
 export const onboardingsRouter = Router();
 
@@ -61,6 +61,24 @@ onboardingsRouter.post("/", async (req, res) => {
 
   // Isolate the risky agent call: onboarding creation must succeed even if this fails/times out.
   const narrativeOutcome = await runNarrative({ employeeName, employeeEmail, profileId, projectId }, onEvent);
+  const creationTimestamp = new Date().toISOString();
+  const actionLog: ActionLogEntry = narrativeOutcome.ok
+    ? {
+        id: crypto.randomUUID(),
+        timestamp: creationTimestamp,
+        actor: "system",
+        type: "status_change",
+        message: "Plan generated successfully",
+        toStatus: "draft",
+      }
+    : {
+        id: crypto.randomUUID(),
+        timestamp: creationTimestamp,
+        actor: "system",
+        type: "generation_failure",
+        message: narrativeOutcome.error,
+        toStatus: "blocked",
+      };
 
   const record: OnboardingRecord = {
     id: crypto.randomUUID(),
@@ -73,15 +91,13 @@ onboardingsRouter.post("/", async (req, res) => {
     seniority: seniority || undefined,
     location: location || undefined,
     notes: notes || undefined,
-    createdAt: new Date().toISOString(),
-    // Placeholder — Story 1.2 replaces this with real draft/blocked branching
-    // on narrativeOutcome.ok.
-    status: "draft",
+    createdAt: creationTimestamp,
+    status: narrativeOutcome.ok ? "draft" : "blocked",
     plan,
     narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
     narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
     events: collectedEvents,
-    actionLog: [],
+    actionLog: [actionLog],
     profile,
     project,
   };
