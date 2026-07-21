@@ -12,6 +12,7 @@ import {
   deleteOnboarding,
   markCompleted,
   sendForApproval,
+  computeApprovalStatus,
 } from "../store";
 import { ActionLogEntry, OnboardingRecord } from "../types";
 
@@ -75,6 +76,15 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
+  if (startDate) {
+    try {
+      computeApprovalStatus(startDate);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+  }
+
   // Validate + build the deterministic parts BEFORE switching to a streaming
   // response, so a bad profile/project id still gets a normal 400 JSON error
   // rather than a malformed SSE stream (headers can't change once sent).
@@ -88,54 +98,80 @@ onboardingsRouter.post("/", async (req, res) => {
     return;
   }
 
+  const creationTimestamp = new Date().toISOString();
+  const recordId = crypto.randomUUID();
+  const initialRecord: OnboardingRecord = {
+    id: recordId,
+    employeeName,
+    employeeEmail,
+    profileId,
+    projectId,
+    startDate: startDate || undefined,
+    buddyEmail: buddyEmail || undefined,
+    seniority: seniority || undefined,
+    location: location || undefined,
+    notes: notes || undefined,
+    createdAt: creationTimestamp,
+    status: "blocked",
+    plan,
+    narrative: null,
+    narrativeError: "Generation in progress",
+    events: [],
+    actionLog: [
+      {
+        id: crypto.randomUUID(),
+        timestamp: creationTimestamp,
+        actor: "system",
+        type: "generation_failure",
+        message: "Generation in progress",
+        toStatus: "blocked",
+      },
+    ],
+    profile,
+    project,
+  };
+
+  try {
+    saveOnboarding(initialRecord);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to save onboarding" });
+    return;
+  }
+
   await streamGeneration(res, { employeeName, employeeEmail, profileId, projectId }, (narrativeOutcome, events) => {
-    const creationTimestamp = new Date().toISOString();
     const actionLog: ActionLogEntry = narrativeOutcome.ok
       ? {
-          id: crypto.randomUUID(),
-          timestamp: creationTimestamp,
-          actor: "system",
+          ...initialRecord.actionLog[0],
           type: "status_change",
           message: "Plan generated successfully",
           toStatus: "draft",
         }
       : {
-          id: crypto.randomUUID(),
-          timestamp: creationTimestamp,
-          actor: "system",
-          type: "generation_failure",
+          ...initialRecord.actionLog[0],
           message: narrativeOutcome.error,
-          toStatus: "blocked",
         };
-
     const record: OnboardingRecord = {
-      id: crypto.randomUUID(),
-      employeeName,
-      employeeEmail,
-      profileId,
-      projectId,
-      startDate: startDate || undefined,
-      buddyEmail: buddyEmail || undefined,
-      seniority: seniority || undefined,
-      location: location || undefined,
-      notes: notes || undefined,
-      createdAt: creationTimestamp,
+      ...initialRecord,
       status: narrativeOutcome.ok ? "draft" : "blocked",
       plan,
       narrative: narrativeOutcome.ok ? narrativeOutcome.narrative : null,
       narrativeError: narrativeOutcome.ok ? undefined : narrativeOutcome.error,
       events,
       actionLog: [actionLog],
-      profile,
-      project,
     };
-    saveOnboarding(record);
+    updateOnboarding(record);
     return record;
   });
 });
 
 onboardingsRouter.post("/:id/retry", async (req, res) => {
-  const existing = getOnboarding(req.params.id);
+  let existing: OnboardingRecord | undefined;
+  try {
+    existing = getOnboarding(req.params.id);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to load onboarding" });
+    return;
+  }
   if (!existing) {
     res.status(404).json({ error: `Onboarding '${req.params.id}' not found` });
     return;
@@ -191,7 +227,7 @@ onboardingsRouter.post("/:id/complete", (req, res) => {
   try {
     const result = markCompleted(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);
@@ -204,7 +240,7 @@ onboardingsRouter.post("/:id/approve", (req, res) => {
   try {
     const result = approveOnboarding(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);
@@ -217,7 +253,7 @@ onboardingsRouter.post("/:id/send-for-approval", (req, res) => {
   try {
     const result = sendForApproval(req.params.id);
     if (!result.ok) {
-      res.status(result.error.includes("not found") ? 404 : 409).json({ error: result.error });
+      res.status(result.code === "not_found" ? 404 : 409).json({ error: result.error });
       return;
     }
     res.json(result.record);

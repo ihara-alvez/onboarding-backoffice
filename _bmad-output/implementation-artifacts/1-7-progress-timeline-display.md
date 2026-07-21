@@ -4,7 +4,7 @@ baseline_commit: 79436b0e8bb144eca3524c3b5f54c25a755419de
 
 # Story 1.7: Progress Timeline Display
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -76,3 +76,15 @@ None — no failures encountered. Verification: `frontend/npm run build`, `front
 ## Change Log
 
 - 2026-07-21 — Implemented Story 1.7: Progress timeline derived from actionLog, including the synthetic read-time flip row. All 4 tasks complete, all 3 ACs satisfied and verified. Status → review.
+
+### Review Findings
+
+- [x] [Review][Patch] Completed records omit the synthetic `in_progress` transition [frontend/src/pages/OnboardingDetailPage.tsx:55] — The synthetic row is added only while the effective record status is `in_progress`; after `markCompleted` returns `completed`, a `ready_for_day_1` record with a passed start date no longer shows the read-time `in_progress` transition required by AC1/AC2.
+- [x] [Review][Patch] Date-only start dates can display on the previous calendar day [frontend/src/pages/OnboardingDetailPage.tsx:231] — `new Date("YYYY-MM-DD")` is parsed as UTC midnight and `toLocaleString()` can render the synthetic transition on the prior local date for users west of UTC, obscuring the date required by AC2.
+- [x] [Review][Patch] Malformed legacy approved records can make the store unreadable [backend/src/store.ts:45-58] — Normalizing a legacy `approved` record calls `computeApprovalStatus()` and throws for an invalid date; `readAll()` maps every record, so one malformed record breaks list/get and mutation endpoints.
+- [x] [Review][Patch] Creation accepts invalid start dates [backend/src/routes/onboardings.ts:111-118] — The create route persists any non-empty `startDate`, while approval later rejects malformed values, leaving the onboarding permanently unapprovable.
+- [x] [Review][Patch] Retry preflight errors can escape without an HTTP response [backend/src/routes/onboardings.ts:137-145] — `getOnboarding()` runs outside error handling in the async retry route, so store/normalization failures can reject the handler before a response is sent.
+- [x] [Review][Patch] Initial persistence failures do not preserve the blocked outcome [backend/src/routes/onboardings.ts:55-65, 91-133] — If record construction or `saveOnboarding()` fails after generation, the SSE stream emits an error but no blocked record is retained, contrary to the failure-recovery lifecycle.
+- [x] [Review][Patch] Completed SSE streams leave the reader open [frontend/src/api/client.ts:98-101] — `streamRequest()` returns immediately on `done` without cancelling or releasing the response reader; repeated generation/retry operations can retain stream resources.
+- [x] [Review][Patch] Error classification depends on error-message wording [backend/src/routes/onboardings.ts:193-220] — State-changing routes infer 404 versus 409 with `result.error.includes("not found")`, so changing a message can silently produce the wrong HTTP status.
+- [x] [Review][Defer] State-changing endpoints have no authorization boundary [backend/src/routes/onboardings.ts:190-227] — deferred, pre-existing application-wide authentication scope rather than a defect introduced by Story 1.7.

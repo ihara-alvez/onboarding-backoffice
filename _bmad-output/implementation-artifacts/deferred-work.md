@@ -42,3 +42,6 @@
 - Progress entries are rendered without chronological sorting (`frontend/src/pages/OnboardingDetailPage.tsx:50-59`).
 - Malformed ready-for-day-1 dates are handled inconsistently (`backend/src/store.ts:62-67`).
 - The baseline-to-HEAD diff includes unrelated backend, API, manifest, and environment changes despite Story 1.6’s pure-display/file-scope constraint.
+## Deferred from: code review of 1-7-progress-timeline-display (2026-07-21)
+
+- State-changing endpoints have no authorization boundary in `backend/src/routes/onboardings.ts:190-227`; authentication is pre-existing application-wide scope, not introduced by Story 1.7.

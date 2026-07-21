@@ -43,7 +43,11 @@ function normalizeRecord(raw: RawOnboardingRecord): OnboardingRecord {
   if (raw.status === "created") {
     status = "draft";
   } else if (raw.status === "approved") {
-    status = computeApprovalStatus(raw.startDate);
+    try {
+      status = computeApprovalStatus(raw.startDate);
+    } catch {
+      status = "ready_for_day_1";
+    }
   } else if (VALID_STATUSES.has(raw.status as OnboardingStatus)) {
     status = raw.status as OnboardingStatus;
   } else {
@@ -108,7 +112,7 @@ export function updateOnboarding(record: OnboardingRecord): void {
 
 export type StoreResult =
   | { ok: true; record: OnboardingRecord }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: "not_found" };
 
 function appendStatusChange(
   record: OnboardingRecord,
@@ -137,7 +141,7 @@ function appendStatusChange(
 export function sendForApproval(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "draft") {
     return { ok: false, error: "Cannot send for approval: onboarding is not a draft" };
   }
@@ -149,7 +153,7 @@ export function sendForApproval(id: string): StoreResult {
 export function revertToDraft(id: string, reason: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "pending_approval") {
     return { ok: false, error: "Cannot revert to draft: onboarding is not pending approval" };
   }
@@ -161,7 +165,7 @@ export function revertToDraft(id: string, reason: string): StoreResult {
 export function approveOnboarding(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   if (all[idx].status !== "pending_approval") {
     return { ok: false, error: "Cannot approve: plan changed, please review again" };
   }
@@ -195,7 +199,7 @@ export function approveOnboarding(id: string): StoreResult {
 export function markCompleted(id: string): StoreResult {
   const all = readAll();
   const idx = all.findIndex((r) => r.id === id);
-  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found` };
+  if (idx === -1) return { ok: false, error: `Onboarding '${id}' not found`, code: "not_found" };
   const fromStatus = computeEffectiveStatus(all[idx]);
   if (fromStatus !== "in_progress") {
     return { ok: false, error: "Cannot mark complete: onboarding is not in progress" };
