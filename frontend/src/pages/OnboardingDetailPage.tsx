@@ -292,7 +292,7 @@ ${repo.test}`}
       </Card>
 
       <Card className="mb-6">
-        <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
+        <SectionTitle>{isApprovedStatus(record.status) ? "Approved Permissions" : "Requested Permissions"}</SectionTitle>
         <p className="mb-1 text-label-large text-on-surface-variant">AWS</p>
         <BulletList items={profile.permissions.aws} />
         <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Repository access</p>

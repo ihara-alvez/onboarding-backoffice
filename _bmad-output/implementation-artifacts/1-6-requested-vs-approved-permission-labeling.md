@@ -4,7 +4,7 @@ baseline_commit: a730578bc7aac01f574b348ff1a02d10a4d8fa6b
 
 # Story 1.6: Requested vs. Approved Permission Labeling
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -49,6 +49,20 @@ so that I never mistake a pending grant for one that's actually been signed off.
 - [Source: _bmad-output/implementation-artifacts/1-1-six-state-status-model-migration-log-schema.md] — `statusDisplay.ts` and `statusTone()`, which this story extends
 
 ## Dev Agent Record
+
+### Review Findings
+
+- [x] [Review][Patch] Permission labels do not match the acceptance-criteria capitalization [frontend/src/pages/OnboardingDetailPage.tsx:295] — AC1 and AC2 require `Requested Permissions` and `Approved Permissions`; fixed to title case.
+- [x] [Review][Defer] Completed timelines omit the synthetic `in_progress` entry [frontend/src/pages/OnboardingDetailPage.tsx:50-59] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Legacy records receive empty action logs [backend/src/store.ts:52] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Retry replaces prior generation events [backend/src/routes/onboardings.ts:181] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Create accepts malformed start dates that approval later rejects [backend/src/routes/onboardings.ts:117] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] One invalid legacy status can break the entire store read [backend/src/store.ts:45-50] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Legacy `createOnboarding()` parses an SSE response as JSON [frontend/src/api/client.ts:39-45] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Date-only status comparisons use UTC midnight [backend/src/store.ts:25-33,55-59] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Progress entries are rendered without chronological sorting [frontend/src/pages/OnboardingDetailPage.tsx:50-59] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] Malformed ready-for-day-1 dates are handled inconsistently [backend/src/store.ts:62-67] — deferred, pre-existing and outside Story 1.6 scope.
+- [x] [Review][Defer] The baseline-to-HEAD diff includes unrelated backend, API, manifest, and environment changes despite Story 1.6’s pure-display/file-scope constraint [backend/src/store.ts; backend/src/routes/onboardings.ts; frontend/src/api/client.ts] — deferred, pre-existing and outside Story 1.6 scope.
 
 ### Agent Model Used
 

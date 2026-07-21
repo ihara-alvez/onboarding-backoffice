@@ -29,3 +29,16 @@
 
 - Retry requests can race because the local JSON store has no concurrency control; this remains outside the single-user demo scope.
 - Retry and completion routes have no authentication/authorization guard because the application has no authentication layer; existing state-changing routes use the same trust model.
+
+## Deferred from: code review of 1-6-requested-vs-approved-permission-labeling (2026-07-21)
+
+- Completed timelines omit the synthetic `in_progress` entry when a record reaches `completed` (`frontend/src/pages/OnboardingDetailPage.tsx:50-59`).
+- Legacy records receive empty action logs (`backend/src/store.ts:52`).
+- Retry replaces prior generation events (`backend/src/routes/onboardings.ts:181`).
+- Create accepts malformed start dates that approval later rejects (`backend/src/routes/onboardings.ts:117`).
+- One invalid legacy status can break the entire store read (`backend/src/store.ts:45-50`).
+- Legacy `createOnboarding()` parses an SSE response as JSON (`frontend/src/api/client.ts:39-45`).
+- Date-only status comparisons use UTC midnight (`backend/src/store.ts:25-33,55-59`).
+- Progress entries are rendered without chronological sorting (`frontend/src/pages/OnboardingDetailPage.tsx:50-59`).
+- Malformed ready-for-day-1 dates are handled inconsistently (`backend/src/store.ts:62-67`).
+- The baseline-to-HEAD diff includes unrelated backend, API, manifest, and environment changes despite Story 1.6’s pure-display/file-scope constraint.
