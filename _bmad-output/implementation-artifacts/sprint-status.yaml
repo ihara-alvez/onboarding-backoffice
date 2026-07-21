@@ -50,10 +50,10 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   epic-1: in-progress
   1-1-six-state-status-model-migration-log-schema: done
-  1-2-automatic-draft-blocked-status-on-generation-outcome: ready-for-dev
-  1-3-manual-submission-for-approval-with-atomic-race-safety: ready-for-dev
-  1-4-approve-action-automatic-post-approval-transitions: ready-for-dev
-  1-5-manual-recovery-completion-actions: ready-for-dev
+  1-2-automatic-draft-blocked-status-on-generation-outcome: done
+  1-3-manual-submission-for-approval-with-atomic-race-safety: done
+  1-4-approve-action-automatic-post-approval-transitions: done
+  1-5-manual-recovery-completion-actions: done
   1-6-requested-vs-approved-permission-labeling: ready-for-dev
   1-7-progress-timeline-display: ready-for-dev
   1-8-full-action-log-display-immutability-guarantee: ready-for-dev
