@@ -19,7 +19,7 @@ import { Markdown } from "../components/Markdown";
 import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
 import { TrashIcon } from "../components/TrashIcon";
-import { statusTone } from "../statusDisplay";
+import { isApprovedStatus, statusTone } from "../statusDisplay";
 
 function BulletList({ items }: { items: string[] }) {
   if (items.length === 0) {
@@ -240,7 +240,7 @@ ${repo.test}`}
       </Card>
 
       <Card className="mb-6">
-        <SectionTitle>Expected permissions</SectionTitle>
+        <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
         <p className="mb-1 text-label-large text-on-surface-variant">AWS</p>
         <BulletList items={profile.permissions.aws} />
         <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Repository access</p>
