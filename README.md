@@ -1,17 +1,17 @@
 # Onboarding Backoffice
 
 A manager-facing web app to create, review, and approve developer onboardings — built on top of
-the [`dayone`](../dayone) workshop repo's domain data (`profiles/`, `projects/`) and its real Lab 2
-Strands agent (`agent/strands_agent.py`).
+the [`dayone`](../dayone) workshop repo's domain data (`profiles/`, `projects/`) and its deployed
+AgentCore Runtime.
 
 This is a **separate repo**, sibling to `dayone`. **`dayone` is never modified** — this app only
-*reads* its YAML files and invokes its Strands agent via a subprocess. See
+*reads* its YAML files and invokes the deployed AgentCore Runtime. See
 [Architecture](#architecture) for exactly how that works.
 
 ## What it does
 
 1. **Create an onboarding** — pick an employee name/email, a profile (role), and a project. The
-   backend calls the real `dayone` Strands agent live against Amazon Bedrock, and streams back what
+   backend calls the deployed AgentCore Runtime live against Amazon Bedrock, and streams back what
    the agent is actually doing (tool calls, reasoning, streamed response text) in real time —
    not a blind loading spinner.
 2. **Review the plan** — repositories to clone, expected permissions, day-1/week-1 checklist,
@@ -24,13 +24,10 @@ This is a **separate repo**, sibling to `dayone`. **`dayone` is never modified**
 ## Prerequisites
 
 - Node.js 20+ and npm.
-- The `dayone` repo cloned as a **sibling directory** (`../dayone` relative to this repo), with:
-  - Its own `.venv` created and `strands-agents`/`boto3`/`PyYAML` installed (see `dayone`'s own
-    README/`WORKSHOP_LABS.md` for Lab 2 setup).
-  - AWS credentials with Bedrock model access, and `AWS_REGION`/`BEDROCK_MODEL_ID` known — this app
-    reuses whatever you already verified working for `dayone`'s Lab 2 (`python -m
-    agent.strands_agent ...`). If that command doesn't work from `dayone` directly, fix that first —
-    this app calls the exact same code path.
+- The `dayone` repo cloned as a **sibling directory** (`../dayone` relative to this repo), so the
+  backend can read its `profiles/*.yaml` and `projects/*.yaml` files.
+- AWS credentials with permission to invoke the deployed Bedrock AgentCore Runtime directly from
+  this Node process. The SDK's default credential chain uses `AWS_PROFILE` and `AWS_REGION`.
 
 ## Running it
 
@@ -44,16 +41,12 @@ npm install   # first time only
 
 export AWS_PROFILE=onboarding-workshop      # or however you authenticate to AWS
 export AWS_REGION=us-east-1
-export BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0
-export DAYONE_REPO_PATH=/absolute/path/to/dayone   # optional — defaults to ../../dayone
+export DAYONE_REPO_PATH=/absolute/path/to/dayone   # optional — defaults to ../../dayone; YAML data only
 
 npm run dev
 ```
 
 You should see `onboarding-backoffice backend listening on http://localhost:8000`.
-`dayone/.venv` is never activated in this shell — only a spawned child process touches it, via the
-absolute path `$DAYONE_REPO_PATH/.venv/bin/python3`.
-
 **2. Frontend** (Vite, port 5173):
 
 ```bash
@@ -84,13 +77,11 @@ output).
 ```
 onboarding-backoffice/          (this repo)
   backend/    Express + TypeScript. Reads dayone's profiles/projects YAML directly,
-              builds the deterministic plan natively in TS, and shells out to Python
-              for exactly one thing: the live agent narrative.
-    python-bridge/run_narrative.py
-              The ONLY file that touches Python/Strands. Imports dayone/agent/strands_agent.py's
-              build_agent() unmodified, swaps in a custom callback_handler (streaming
-              observability events to stderr instead of dayone's default stdout-printing one),
-              and prints the final result as one JSON line on stdout.
+              builds the deterministic plan natively in TS, and invokes the deployed
+              AgentCore Runtime for the live agent narrative.
+    src/agentCoreClient.ts
+              Sends the generation prompt through the AgentCore Runtime SDK, parses its
+              NDJSON response stream, and relays progress events to the SSE route.
     data/onboardings.json
               Local JSON persistence for onboarding records — entirely separate from dayone's
               own .local-progress/ state.
@@ -99,40 +90,21 @@ onboarding-backoffice/          (this repo)
 
 dayone/                          (sibling repo, READ-ONLY from this app's perspective)
   profiles/*.yaml, projects/*.yaml   — read directly by backend/src/catalog.ts
-  agent/strands_agent.py             — invoked via python-bridge/run_narrative.py, unmodified
+  agent/strands_agent.py             — not used by this app's generation path
 ```
-
-### Why a Python subprocess for one piece of a TypeScript app
-
-Strands Agents (the SDK `dayone/agent/strands_agent.py` is built on) is Python-only — there's no
-TypeScript port. Rather than reimplementing agent reasoning/tool-calling in TS (which would stop
-being "dayone's actual agent"), the backend spawns `dayone`'s own Python environment as a
-subprocess for that one call, the same way you might shell out to `ffmpeg` or `pandoc` for a task
-outside your main language. Everything else — reading YAML, building the deterministic plan, local
-persistence, the approve action — is plain TypeScript.
 
 ### Live observability (not a blind spinner)
 
-`run_narrative.py` sets `agent.callback_handler` to a custom function (mirroring
-`strands.handlers.callback_handler.PrintingCallbackHandler`'s own logic) that emits one JSON event
-per line to **stderr** as the agent works — a `tool_call` event each time the agent invokes
-`load_profile`/`load_project`/`generate_onboarding_plan`, and `text` events for each streamed
-response chunk. **stdout** stays reserved for exactly one JSON blob, printed once at the end — the
-final narrative or an error — so parsing the "final result" never changed.
+The AgentCore Runtime streams NDJSON events for tool calls, reasoning, and response text.
+`backend/src/agentCoreClient.ts` incrementally decodes that stream, accumulates the narrative, and
+relays each progress event to a caller-supplied callback in real time. Usage and metrics events are
+logged server-side only.
 
-`backend/src/pythonBridge.ts` reads stderr line-by-line as it arrives (not buffered until the
-process exits) and relays each parsed event to a caller-supplied callback in real time.
 `POST /api/onboardings` uses that to stream Server-Sent Events to the browser: an `event: progress`
 message per agent event, then one final `event: done` message carrying the complete onboarding
 record. The frontend (`CreateOnboardingPage.tsx` + `ProgressLog.tsx`) reads this stream directly via
 `fetch` + `ReadableStream` (not the browser's built-in `EventSource`, since that only supports GET)
 and renders each tool call as it happens, with the streamed text accumulating live underneath.
-
-**Important: this observability hook lives entirely in this repo's `run_narrative.py`, not in
-`dayone`.** `dayone/agent/strands_agent.py::build_agent()` is called completely unmodified; we just
-override `agent.callback_handler` on the returned object before invoking it — the same extension
-point Strands itself uses internally, just pointed at our own event emitter instead of the default
-stdout-printing one.
 
 ### Snapshotting profile/project data
 
