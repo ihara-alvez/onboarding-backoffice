@@ -290,3 +290,59 @@ export function deleteOnboarding(id: string): boolean {
   writeAll(remaining);
   return true;
 }
+
+export type ChatRevisionResult =
+  | { kind: "deleted" }
+  | { kind: "discarded"; record: OnboardingRecord }
+  | { kind: "applied"; record: OnboardingRecord }
+  | { kind: "failed"; error: string; record: OnboardingRecord };
+
+export function applyChatRevision(
+  id: string,
+  message: string,
+  outcome: { ok: true; text: string } | { ok: false; error: string }
+): ChatRevisionResult {
+  const all = readAll();
+  const idx = all.findIndex((record) => record.id === id);
+  if (idx === -1) return { kind: "deleted" };
+
+  const current = all[idx];
+  const timestamp = new Date().toISOString();
+  if (current.status !== "draft") {
+    const record = {
+      ...current,
+      actionLog: [
+        ...current.actionLog,
+        {
+          id: crypto.randomUUID(),
+          timestamp,
+          actor: "manager" as const,
+          type: "chat_message" as const,
+          message: "Revision discarded: onboarding was approved before the response arrived",
+        },
+      ],
+    };
+    all[idx] = record;
+    writeAll(all);
+    return { kind: "discarded", record };
+  }
+
+  const logMessage = outcome.ok ? `Plan revised per chat request: "${message}"` : outcome.error;
+  const record: OnboardingRecord = {
+    ...current,
+    ...(outcome.ok ? { narrative: outcome.text, narrativeError: undefined } : {}),
+    actionLog: [
+      ...current.actionLog,
+      {
+        id: crypto.randomUUID(),
+        timestamp,
+        actor: "manager",
+        type: "chat_message",
+        message: logMessage,
+      },
+    ],
+  };
+  all[idx] = record;
+  writeAll(all);
+  return outcome.ok ? { kind: "applied", record } : { kind: "failed", error: outcome.error, record };
+}

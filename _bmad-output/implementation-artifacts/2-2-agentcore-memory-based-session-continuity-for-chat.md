@@ -1,6 +1,10 @@
 # Story 2.2: AgentCore Memory-Based Session Continuity for Chat
 
-Status: ready-for-dev
+---
+baseline_commit: 820e85e272a0f87360aae75fb05c8d8e9b83b44a
+---
+
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -20,13 +24,13 @@ so that I don't have to repeat context every message.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Session/user id scheme as a tiny shared module (AC: 1, 2)
-  - [ ] Create `backend/src/chatSession.ts` exporting: `CHAT_USER_ID = "backoffice-manager"` (fixed placeholder — no manager auth exists) and `getChatSessionId(onboardingId: string): string` — returns `onboardingId` directly. The onboarding's own `id` (a `crypto.randomUUID()`, 36 characters) already clears the AgentCore `runtimeSessionId` 33+ character minimum, so no padding/transformation is needed, just reuse it verbatim.
-  - [ ] Story 2.3 will import `CHAT_USER_ID`/`getChatSessionId` and pass them as the `runtimeSessionId` (top-level SDK param) *and* the payload's `userId`/`sessionId` fields on every chat call for that onboarding — that consistent reuse **is** the entire continuity mechanism from this app's side.
-- [ ] Task 2: Verify the mechanism actually works (AC: 1, 2, 3)
-  - [ ] No chat UI/endpoint exists yet (Story 2.3 builds it) — verify with a scratch script: call `InvokeAgentRuntimeCommand` twice using the **same** `runtimeSessionId`/`sessionId` (e.g. a throwaway UUID standing in for an onboarding id), first asking the agent to remember a fact, second asking it to recall that fact — confirm the second response reflects it. Then repeat with two **different** session ids and confirm no cross-contamination.
-- [ ] Task 3: Documentation-only — no code (AC: 3, 4, 5)
-  - [ ] No action needed for AC4 (MEMORY_ID is confirmed configured for this deployment, per `addendum.md`'s citation of `dayone/agentcore/cdk/cdk-outputs.json`) or AC5 (already a documented, accepted MVP decision) — this task exists only to confirm these are not silently forgotten, not to write new code.
+- [x] Task 1: Session/user id scheme as a tiny shared module (AC: 1, 2)
+  - [x] Create `backend/src/chatSession.ts` exporting: `CHAT_USER_ID = "backoffice-manager"` (fixed placeholder — no manager auth exists) and `getChatSessionId(onboardingId: string): string` — returns `onboardingId` directly. The onboarding's own `id` (a `crypto.randomUUID()`, 36 characters) already clears the AgentCore `runtimeSessionId` 33+ character minimum, so no padding/transformation is needed, just reuse it verbatim.
+  - [x] Story 2.3 will import `CHAT_USER_ID`/`getChatSessionId` and pass them as the `runtimeSessionId` (top-level SDK param) *and* the payload's `userId`/`sessionId` fields on every chat call for that onboarding — that consistent reuse **is** the entire continuity mechanism from this app's side.
+- [x] Task 2: Verify the mechanism actually works (AC: 1, 2, 3)
+  - [x] No chat UI/endpoint exists yet (Story 2.3 builds it) — verify with a scratch script: call `InvokeAgentRuntimeCommand` twice using the **same** `runtimeSessionId`/`sessionId` (e.g. a throwaway UUID standing in for an onboarding id), first asking the agent to remember a fact, second asking it to recall that fact — confirm the second response reflects it. Then repeat with two **different** session ids and confirm no cross-contamination. Live verification passed with the `bedrock-workshop-iam` profile: the same session recalled `cobalt-orchid-7`, while a different session did not see `alpha-lantern-4`.
+- [x] Task 3: Documentation-only — no code (AC: 3, 4, 5)
+  - [x] No action needed for AC4 (MEMORY_ID is confirmed configured for this deployment, per `addendum.md`'s citation of `dayone/agentcore/cdk/cdk-outputs.json`) or AC5 (already a documented, accepted MVP decision) — this task exists only to confirm these are not silently forgotten, not to write new code.
 
 ## Dev Notes
 
@@ -52,6 +56,24 @@ so that I don't have to repeat context every message.
 
 ### Debug Log References
 
+- 2026-07-22: Initial sandboxed `npm test` was blocked by `tsx` IPC `listen EPERM`; elevated run passed all 6 tests.
+- 2026-07-22: Live AgentCore smoke script could not load credentials (`CredentialsProviderError`), so Task 2 remains open.
+- 2026-07-22: Re-ran the live smoke script after Story 2.3 added the chat endpoint and shared session wiring; it still stopped before invocation because no AWS credentials were available.
+- 2026-07-22: Live smoke verification passed with `AWS_PROFILE=bedrock-workshop-iam`; same-session recall succeeded and different-session isolation succeeded.
+
 ### Completion Notes List
 
+- Added a shared chat session module that uses the fixed manager placeholder and returns each onboarding UUID unchanged for both AgentCore runtime and payload session identifiers.
+- Added Node tests covering stable reuse and cross-onboarding isolation. The deployed AgentCore Memory continuity behavior remains owned by the runtime's server-side MemoryHook; no direct Memory API calls were added.
+- Verified the configured MEMORY_ID and accepted unbounded accumulation decisions from the existing deployment addendum; no app-side fallback, cap, or reset was introduced.
+- Live AgentCore verification passed using the configured `bedrock-workshop-iam` profile: repeated turns on one session retained context, while separate sessions remained isolated.
+
 ### File List
+
+- `backend/src/chatSession.ts`
+- `backend/src/chatSession.test.ts`
+- `backend/package.json`
+
+### Change Log
+
+- 2026-07-22: Added shared AgentCore chat session/user id module and local coverage; live continuity and isolation verification passed; story moved to `review`.

@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-20
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 project: onboarding-backoffice
 project_key: NOKEY
 tracking_system: file-system
@@ -61,8 +61,8 @@ development_status:
 
   epic-2: in-progress
   2-1-replace-subprocess-with-agentcore-runtime-sdk-for-plan-generation: done
-  2-2-agentcore-memory-based-session-continuity-for-chat: ready-for-dev
-  2-3-conversational-plan-revision-endpoint-streaming: ready-for-dev
+  2-2-agentcore-memory-based-session-continuity-for-chat: done
+  2-3-conversational-plan-revision-endpoint-streaming: done
   2-4-chat-entry-point-visibility-live-streaming-ui: ready-for-dev
   2-5-chat-read-only-after-approval: ready-for-dev
   2-6-chat-messages-recorded-in-action-log: ready-for-dev
