@@ -7,9 +7,10 @@ import {
   getOnboarding,
   markCompleted,
   retryGeneration,
+  sendChatMessage,
   sendForApproval,
 } from "../api/client";
-import type { OnboardingRecord, OnboardingStatus } from "../api/types";
+import type { OnboardingRecord, OnboardingStatus, ProgressEvent } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Chip } from "../components/Chip";
@@ -18,6 +19,7 @@ import { IconButton } from "../components/IconButton";
 import { Markdown } from "../components/Markdown";
 import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
+import { TextField } from "../components/TextField";
 import { TrashIcon } from "../components/TrashIcon";
 import { isApprovedStatus, statusTone } from "../statusDisplay";
 
@@ -86,6 +88,10 @@ export function OnboardingDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [chatEvents, setChatEvents] = useState<ProgressEvent[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -161,6 +167,24 @@ export function OnboardingDetailPage() {
       setError((err as Error).message);
     } finally {
       setCompleting(false);
+    }
+  }
+
+  async function handleSendChat() {
+    if (!id || !chatMessage.trim()) return;
+    setSendingChat(true);
+    setChatError(null);
+    setChatEvents([]);
+    try {
+      const updated = await sendChatMessage(id, chatMessage, (event) =>
+        setChatEvents((prev) => [...prev, event])
+      );
+      setRecord(updated);
+      setChatMessage("");
+    } catch (err) {
+      setChatError((err as Error).message);
+    } finally {
+      setSendingChat(false);
     }
   }
 
@@ -289,6 +313,37 @@ export function OnboardingDetailPage() {
           </div>
         </Collapsible>
       </Card>
+
+      {record.status !== "blocked" && (
+        <Card className="mb-6">
+          <Collapsible label="Revise plan via chat">
+            {record.status === "draft" || record.status === "pending_approval" ? (
+              <div className="flex flex-col gap-3">
+                <TextField
+                  label="Message"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  disabled={sendingChat}
+                  placeholder="e.g. drop the internal-tools repo, they won't touch it in month one"
+                />
+                <Button
+                  onClick={handleSendChat}
+                  disabled={sendingChat || !chatMessage.trim()}
+                  className="self-start"
+                >
+                  {sendingChat ? "Sending..." : "Send"}
+                </Button>
+                {chatError && <Card tint="error">{chatError}</Card>}
+                {chatEvents.length > 0 && <ProgressLog events={chatEvents} live={sendingChat} />}
+              </div>
+            ) : (
+              <p className="text-body-medium text-on-surface-variant">
+                Chat is read-only for this onboarding.
+              </p>
+            )}
+          </Collapsible>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <SectionTitle>Repositories</SectionTitle>

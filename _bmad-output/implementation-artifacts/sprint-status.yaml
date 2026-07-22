@@ -63,7 +63,7 @@ development_status:
   2-1-replace-subprocess-with-agentcore-runtime-sdk-for-plan-generation: done
   2-2-agentcore-memory-based-session-continuity-for-chat: ready-for-dev
   2-3-conversational-plan-revision-endpoint-streaming: ready-for-dev
-  2-4-chat-entry-point-visibility-live-streaming-ui: ready-for-dev
+  2-4-chat-entry-point-visibility-live-streaming-ui: review
   2-5-chat-read-only-after-approval: ready-for-dev
   2-6-chat-messages-recorded-in-action-log: ready-for-dev
   epic-2-retrospective: optional

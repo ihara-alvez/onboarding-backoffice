@@ -118,6 +118,22 @@ export function retryGeneration(id: string, onProgress: (event: ProgressEvent) =
   return streamRequest<OnboardingRecord>(`/api/onboardings/${id}/retry`, { method: "POST" }, onProgress);
 }
 
+export function sendChatMessage(
+  id: string,
+  message: string,
+  onProgress: (event: ProgressEvent) => void
+): Promise<OnboardingRecord> {
+  return streamRequest<OnboardingRecord>(
+    `/api/onboardings/${id}/chat`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    },
+    onProgress
+  );
+}
+
 export function markCompleted(id: string): Promise<OnboardingRecord> {
   return fetch(`/api/onboardings/${id}/complete`, { method: "POST" }).then((r) =>
     handle<OnboardingRecord>(r)
