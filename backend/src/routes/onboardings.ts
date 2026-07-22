@@ -319,12 +319,15 @@ Use the load_profile and load_project tools to reload the data, then use generat
       const result = applyChatRevision(id, message, outcome);
       if (result.kind === "deleted") return;
       if (result.kind === "failed") {
-        sseWrite(res, "error", { error: result.error });
+        sseWrite(res, "error", { error: result.error || "Unable to revise plan" });
         return;
       }
       sseWrite(res, "done", result.record);
     } catch (err) {
-      if (!disconnected) sseWrite(res, "error", { error: err instanceof Error ? err.message : "Unable to revise plan" });
+      if (!disconnected) {
+        const message = err instanceof Error ? err.message : "";
+        sseWrite(res, "error", { error: message || "Unable to revise plan" });
+      }
     } finally {
       res.off("close", handleDisconnect);
       res.end();

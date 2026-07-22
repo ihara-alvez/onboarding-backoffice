@@ -59,11 +59,11 @@ development_status:
   1-8-full-action-log-display-immutability-guarantee: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-replace-subprocess-with-agentcore-runtime-sdk-for-plan-generation: done
   2-2-agentcore-memory-based-session-continuity-for-chat: done
   2-3-conversational-plan-revision-endpoint-streaming: done
-  2-4-chat-entry-point-visibility-live-streaming-ui: review
-  2-5-chat-read-only-after-approval: review
-  2-6-chat-messages-recorded-in-action-log: review
+  2-4-chat-entry-point-visibility-live-streaming-ui: done
+  2-5-chat-read-only-after-approval: done
+  2-6-chat-messages-recorded-in-action-log: done
   epic-2-retrospective: optional

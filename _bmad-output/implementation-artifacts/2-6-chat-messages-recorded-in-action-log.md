@@ -4,7 +4,7 @@ baseline_commit: 601d3f3cc715a2a1e30aaf699e563bc1197c38d2
 
 # Story 2.6: Chat Messages Recorded in Action Log
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -27,6 +27,13 @@ so that plan revisions are just as auditable as status changes and approvals.
   - [x] Confirm by inspection (not new code) that the three message strings Story 2.3/1.3 use are genuinely distinguishable from each other and from a plain status transition: `"Sent for approval"` / `"Chat message sent while pending approval"` (Story 1.3, `type: "status_change"`) vs. `"Plan revised per chat request: \"<message>\""` (Story 2.3 success, `type: "chat_message"`) vs. `"Revision discarded: onboarding was approved before the response arrived"` (Story 2.3 rejected-late, `type: "chat_message"`) vs. `<the raw failure reason>` (Story 2.3 failure, `type: "chat_message"`). If any two of these read ambiguously similar in the rendered Action Log, adjust the message text in `agentCoreClient.ts`/`store.ts`/the `/chat` route — that's the only "fix" this story might produce.
 - [x] Task 2: End-to-end verification (AC: 1, 2, 3)
   - [x] Manually walk through: send a chat message on a `draft` onboarding (expect one `chat_message` entry). Send one on a `pending_approval` onboarding (expect a `status_change` reversion entry *and* a `chat_message` entry — two, distinguishable by their `type` and `message`). Force the mid-stream-approval race (per Story 2.3's own verification steps) and confirm the rejected-late-revision entry is clearly distinct from a normal successful one.
+
+### Review Findings
+
+- [x] [Review][Patch] Empty-string error message would fall through the "is it a string" fallback check in both `streamRequest` and the `/chat` route's catch block, rendering a blank error [onboardings.ts:322,327] — **fixed**: both SSE error sites now fall back to `"Unable to revise plan"` when the underlying message is empty, not just when it's non-string.
+- [x] [Review][Patch] Story 2.3's own Dev Notes still described the `{ message: ... }` SSE shape this review found and fixed in code, leaving the spec doc contradicting the shipped code — **fixed**: updated `2-3-conversational-plan-revision-endpoint-streaming.md` to `{ error: ... }` with a dated correction note.
+- [x] [Review][Defer] Backend never locks `/approve` or `/send-for-approval` against a concurrent `/chat` request — pre-existing gap in Story 2.3's already-merged code (`backend/src/routes/onboardings.ts`), not introduced by this diff. Frontend's new mutual-exclusion (Story 2.4's Review Findings) closes the practical UI path to it, but the server-side race technically remains open to a direct API call. Deferred — cross-track backend concurrency work, not blocking this UI-focused PR.
+- [x] [Review][Defer] Zero regression coverage for the SSE error-shape bug just fixed — this project's test convention (`node:test` via `tsx --test`) doesn't yet cover HTTP routes at all (only pure functions in `agentCoreClient.test.ts`/`chatSession.test.ts`). Adding route-level test coverage is a real but separate testing-infrastructure investment, not scoped to this review.
 
 ## Dev Notes
 

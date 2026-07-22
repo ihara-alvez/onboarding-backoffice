@@ -4,7 +4,7 @@ baseline_commit: 820e85e272a0f87360aae75fb05c8d8e9b83b44a
 
 # Story 2.4: Chat Entry Point Visibility & Live Streaming UI
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,6 +35,13 @@ so that I always know when I can ask for a change and never wonder if my message
 - [x] Task 3: Verify (AC: 1–5)
   - [x] `npm run build`/`lint` in `frontend/`.
   - [x] Confirm the chat entry point is present for `draft`/`pending_approval` onboardings and absent for the other four statuses. Send a message, confirm live tool-call/reasoning/text events appear the same way they do during initial generation, confirm the input is disabled throughout, confirm the narrative updates on success and an inline error appears (with the prior narrative still visible) on a forced failure.
+
+### Review Findings
+
+- [x] [Review][Patch] Stale status/action buttons after a failed chat revision on `pending_approval` — backend's `revertToDraft` commits synchronously *before* the agent call, so a subsequent AgentCore failure left the record `draft` server-side while the page kept showing stale `pending_approval` UI [OnboardingDetailPage.tsx:184-186] — **fixed**: `handleSendChat`'s catch block now refetches and applies the current record on failure, in addition to surfacing the chat error.
+- [x] [Review][Patch] Chat state leaked across onboardings + in-flight response could overwrite the wrong record after navigation [OnboardingDetailPage.tsx:91-101] — **fixed**: added a `currentIdRef` guard checked before every chat-triggered state update, and reset all chat state in the existing `[id]` effect.
+- [x] [Review][Patch] `sendingChat` was excluded from the page's mutual-exclusion pattern in both directions [OnboardingDetailPage.tsx:331,416,421,426,431,440] — **fixed**: added `sendingChat` to all five action buttons' `disabled` lists, and added the other four flags to the chat Send button/TextField via a shared `anyActionInFlight`.
+- [x] [Review][Patch] `chatMessage.trim()` guarded the send but the untrimmed value was what got sent [OnboardingDetailPage.tsx:174] — **fixed**: trims once and reuses the trimmed value throughout.
 
 ## Dev Notes
 

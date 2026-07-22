@@ -4,7 +4,7 @@ baseline_commit: 3ea645a9b0dbce44cb6bbd79d654a854830981b2
 
 # Story 2.5: Chat Read-Only After Approval
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -27,6 +27,10 @@ so that the approved plan can never be second-guessed by a stray late message.
 - [x] Task 2: Verify (AC: 1, 2)
   - [x] `npm run build`/`lint` in `frontend/`.
   - [x] Approve an onboarding that has at least one prior chat exchange (per Story 2.3/2.4's manual verification), confirm its detail view shows the read-only transcript (chat-filtered `actionLog` entries) with no active input. Force the mid-stream-approval race (per Story 2.3's manual verification) and confirm the resulting "Revision discarded: onboarding was approved before the response arrived" entry appears in this same read-only view — visible for reference, distinct from (and not applied to) the onboarding's actual `narrative`.
+
+### Review Findings
+
+- [x] [Review][Patch] Read-only transcript rows dropped the `actor` segment despite this story's own Task 1 claiming to reuse Story 1.8's exact Action Log row style (which shows `timestamp · actor · message`) [OnboardingDetailPage.tsx:373-376] — **fixed**: added the actor segment so the row shape now genuinely matches.
 
 ## Dev Notes
 
