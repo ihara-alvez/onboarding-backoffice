@@ -2,8 +2,9 @@ import { Router } from "express";
 import crypto from "crypto";
 import { getProfile, getProject } from "../catalog";
 import { buildOnboardingPlan } from "../planBuilder";
-import { runNarrative, NarrativeArgs, NarrativeOutcome } from "../agentCoreClient";
-import { ProgressEvent } from "../types";
+import { invokeAgent, runNarrative, NarrativeArgs, NarrativeOutcome } from "../agentCoreClient";
+import type { ProgressEvent } from "../types";
+import { CHAT_USER_ID, getChatSessionId } from "../chatSession";
 import {
   listOnboardings,
   getOnboarding,
@@ -15,10 +16,13 @@ import {
   computeApprovalStatus,
   finalizeGeneration,
   finalizeRetry,
+  revertToDraft,
+  applyChatRevision,
 } from "../store";
-import { OnboardingRecord } from "../types";
+import type { OnboardingRecord } from "../types";
 
 export const onboardingsRouter = Router();
+const chatLocks = new Map<string, Promise<void>>();
 
 onboardingsRouter.get("/", (_req, res) => {
   res.json(listOnboardings());
@@ -35,6 +39,22 @@ onboardingsRouter.get("/:id", (req, res) => {
 
 function sseWrite(res: import("express").Response, event: string, data: unknown): void {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+async function withChatLock<T>(id: string, work: () => Promise<T>): Promise<T> {
+  const previous = chatLocks.get(id) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  chatLocks.set(id, current);
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
+    if (chatLocks.get(id) === current) chatLocks.delete(id);
+  }
 }
 
 async function streamGeneration(
@@ -206,6 +226,110 @@ onboardingsRouter.post("/:id/retry", async (req, res) => {
       finalizeRetry(req.params.id, plan, { ok: false, error }, events);
     }
   );
+});
+
+onboardingsRouter.post("/:id/chat", async (req, res) => {
+  const id = req.params.id;
+  const message = req.body?.message;
+  if (typeof message !== "string" || !message.trim()) {
+    res.status(400).json({ error: "message is required" });
+    return;
+  }
+
+  let existing: OnboardingRecord | undefined;
+  try {
+    existing = getOnboarding(id);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Unable to load onboarding" });
+    return;
+  }
+  if (!existing) {
+    res.status(404).json({ error: `Onboarding '${id}' not found` });
+    return;
+  }
+  if (existing.status !== "draft" && existing.status !== "pending_approval") {
+    res.status(409).json({ error: "Cannot revise plan: onboarding is not a draft or pending approval" });
+    return;
+  }
+  await withChatLock(id, async () => {
+    const current = getOnboarding(id);
+    if (!current) {
+      res.status(404).json({ error: `Onboarding '${id}' not found` });
+      return;
+    }
+    if (current.status !== "draft" && current.status !== "pending_approval") {
+      res.status(409).json({ error: "Cannot revise plan: onboarding is not a draft or pending approval" });
+      return;
+    }
+
+    let chatRecord = current;
+    if (current.status === "pending_approval") {
+      const reverted = revertToDraft(id, "Chat message sent while pending approval");
+      if (!reverted.ok) {
+        res.status(reverted.code === "not_found" ? 404 : 409).json({ error: reverted.error });
+        return;
+      }
+      chatRecord = reverted.record;
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    const abortController = new AbortController();
+    let disconnected = false;
+    const handleDisconnect = () => {
+      disconnected = true;
+      abortController.abort();
+    };
+    res.once("close", handleDisconnect);
+
+    try {
+      const prompt = `The manager wants to revise the onboarding plan for employee '${chatRecord.employeeName}' (email ${chatRecord.employeeEmail}), profile '${chatRecord.profileId}', project '${chatRecord.projectId}'.
+
+Current plan:
+${chatRecord.narrative ?? ""}
+
+Requested change: ${message}
+
+Use the load_profile and load_project tools to reload the data, then use generate_onboarding_plan to produce the REVISED plan in Markdown, reflecting the requested change. Show me the full updated plan.`;
+      const sessionId = getChatSessionId(chatRecord.id);
+      const outcome = await invokeAgent(
+        {
+          prompt,
+          userId: CHAT_USER_ID,
+          sessionId,
+          modelId: "anthropic.claude-haiku-4-5",
+          modelApi: "messages",
+          guardrailId: process.env.AGENTCORE_GUARDRAIL_ID ?? "wb4578p8755b",
+          guardrailVersion: process.env.AGENTCORE_GUARDRAIL_VERSION ?? "1",
+          guardrailEnabled: true,
+        },
+        sessionId,
+        (event) => {
+          if (!disconnected) sseWrite(res, "progress", event);
+        },
+        abortController.signal
+      );
+      if (disconnected || abortController.signal.aborted) return;
+
+      const result = applyChatRevision(id, message, outcome);
+      if (result.kind === "deleted") return;
+      if (result.kind === "failed") {
+        sseWrite(res, "error", { message: result.error });
+        return;
+      }
+      sseWrite(res, "done", result.record);
+    } catch (err) {
+      if (!disconnected) sseWrite(res, "error", { message: err instanceof Error ? err.message : "Unable to revise plan" });
+    } finally {
+      res.off("close", handleDisconnect);
+      res.end();
+    }
+  });
 });
 
 onboardingsRouter.post("/:id/complete", (req, res) => {

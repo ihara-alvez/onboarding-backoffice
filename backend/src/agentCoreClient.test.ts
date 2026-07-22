@@ -19,7 +19,7 @@ test("parses split SSE events and accumulates nested AgentCore text", async () =
 
   const result = await readAgentStream(response, (event) => events.push(event));
 
-  assert.deepEqual(result, { ok: true, narrative: "Hello world" });
+  assert.deepEqual(result, { ok: true, text: "Hello world" });
   assert.deepEqual(events, [
     { type: "tool_call", tool: "load_profile", count: 1 },
     { type: "reasoning", text: "thinking" },
@@ -36,7 +36,7 @@ test("handles multibyte UTF-8 split across chunks", async () => {
 
   const result = await readAgentStream(response, undefined);
 
-  assert.deepEqual(result, { ok: true, narrative: "café" });
+  assert.deepEqual(result, { ok: true, text: "café" });
 });
 
 test("returns runtime errors and rejects streams without text", async () => {
@@ -64,7 +64,7 @@ test("logs usage and metrics without emitting a ProgressEvent", async () => {
       (event) => events.push(event)
     );
 
-    assert.deepEqual(result, { ok: true, narrative: "ok" });
+    assert.deepEqual(result, { ok: true, text: "ok" });
     assert.equal(events.length, 2);
     assert.equal(calls.length, 1);
   } finally {
