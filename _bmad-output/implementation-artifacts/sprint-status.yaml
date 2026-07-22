@@ -65,5 +65,5 @@ development_status:
   2-3-conversational-plan-revision-endpoint-streaming: done
   2-4-chat-entry-point-visibility-live-streaming-ui: review
   2-5-chat-read-only-after-approval: review
-  2-6-chat-messages-recorded-in-action-log: ready-for-dev
+  2-6-chat-messages-recorded-in-action-log: review
   epic-2-retrospective: optional
