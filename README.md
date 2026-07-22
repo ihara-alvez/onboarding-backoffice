@@ -41,6 +41,9 @@ npm install   # first time only
 
 export AWS_PROFILE=onboarding-workshop      # or however you authenticate to AWS
 export AWS_REGION=us-east-1
+export AGENT_RUNTIME_ARN=arn:aws:bedrock-agentcore:us-east-1:419466290453:runtime/htmx_chatapp_iava-q2e5r0DYmQ
+export AGENTCORE_GUARDRAIL_ID=wb4578p8755b
+export AGENTCORE_GUARDRAIL_VERSION=1
 export DAYONE_REPO_PATH=/absolute/path/to/dayone   # optional — defaults to ../../dayone; YAML data only
 
 npm run dev
@@ -78,7 +81,8 @@ output).
 onboarding-backoffice/          (this repo)
   backend/    Express + TypeScript. Reads dayone's profiles/projects YAML directly,
               builds the deterministic plan natively in TS, and invokes the deployed
-              AgentCore Runtime for the live agent narrative.
+              AgentCore Runtime for the live agent narrative. The runtime ARN and
+              guardrail settings can be overridden with environment variables.
     src/agentCoreClient.ts
               Sends the generation prompt through the AgentCore Runtime SDK, parses its
               NDJSON response stream, and relays progress events to the SSE route.

@@ -6,11 +6,14 @@ import {
 import { ProgressEvent } from "./types";
 
 const AGENT_RUNTIME_ARN =
-  "arn:aws:bedrock-agentcore:us-east-1:419466290453:runtime/htmx_chatapp_iv-YICsef3YpI";
-const AWS_REGION = "us-east-1";
+  process.env.AGENT_RUNTIME_ARN ??
+  "arn:aws:bedrock-agentcore:us-east-1:419466290453:runtime/htmx_chatapp_iava-q2e5r0DYmQ";
+const AWS_REGION = process.env.AWS_REGION ?? "us-east-1";
 const RUNTIME_QUALIFIER = "DEFAULT";
 const MODEL_ID = "anthropic.claude-haiku-4-5";
 const USER_ID = "backoffice-manager";
+const GUARDRAIL_ID = process.env.AGENTCORE_GUARDRAIL_ID ?? "wb4578p8755b";
+const GUARDRAIL_VERSION = process.env.AGENTCORE_GUARDRAIL_VERSION ?? "1";
 const AGENTCORE_TIMEOUT_MS = 120_000;
 
 export interface NarrativeArgs {
@@ -172,6 +175,9 @@ export async function runNarrative(
       sessionId,
       modelId: MODEL_ID,
       modelApi: "messages",
+      guardrailId: GUARDRAIL_ID,
+      guardrailVersion: GUARDRAIL_VERSION,
+      guardrailEnabled: true,
     })
   );
 
