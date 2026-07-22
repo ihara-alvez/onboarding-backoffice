@@ -1,6 +1,10 @@
+---
+baseline_commit: 2c4ed7dab3cbb87a4a86b443740fc2d01f0feb49
+---
+
 # Story 2.1: Replace Subprocess with AgentCore Runtime SDK for Plan Generation
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,33 +27,33 @@ so that generation is production-grade and reliable, and doesn't depend on a loc
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Dependency and file removal (AC: 3)
-  - [ ] Add `@aws-sdk/client-bedrock-agentcore` to `backend/package.json` dependencies (check npm for the current published version at implementation time — this SDK ships as part of the regular `@aws-sdk/client-*` v3 family, same versioning scheme as any other AWS SDK v3 client).
-  - [ ] Delete `backend/src/pythonBridge.ts` and `backend/python-bridge/run_narrative.py` entirely. No fallback path, no feature flag.
-- [ ] Task 2: New `agentCoreClient.ts` module (AC: 1, 2, 4, 5, 6)
-  - [ ] Create `backend/src/agentCoreClient.ts` exporting the **identical interface shape** the old `pythonBridge.ts` exported — `NarrativeArgs` (`employeeName`/`employeeEmail`/`profileId`/`projectId`), `NarrativeOutcome` (`{ ok: true; narrative: string } | { ok: false; error: string }`), and `runNarrative(args, onEvent?): Promise<NarrativeOutcome>` — so `routes/onboardings.ts`'s call site needs **only its import statement changed**, nothing else.
-  - [ ] **Prompt (AC 1, use verbatim — this is the exact text `run_narrative.py` sends today, confirmed by reading it; do not invent a different one)**:
+- [x] Task 1: Dependency and file removal (AC: 3)
+  - [x] Add `@aws-sdk/client-bedrock-agentcore` to `backend/package.json` dependencies (check npm for the current published version at implementation time — this SDK ships as part of the regular `@aws-sdk/client-*` v3 family, same versioning scheme as any other AWS SDK v3 client).
+  - [x] Delete `backend/src/pythonBridge.ts` and `backend/python-bridge/run_narrative.py` entirely. No fallback path, no feature flag.
+- [x] Task 2: New `agentCoreClient.ts` module (AC: 1, 2, 4, 5, 6)
+  - [x] Create `backend/src/agentCoreClient.ts` exporting the **identical interface shape** the old `pythonBridge.ts` exported — `NarrativeArgs` (`employeeName`/`employeeEmail`/`profileId`/`projectId`), `NarrativeOutcome` (`{ ok: true; narrative: string } | { ok: false; error: string }`), and `runNarrative(args, onEvent?): Promise<NarrativeOutcome>` — so `routes/onboardings.ts`'s call site needs **only its import statement changed**, nothing else.
+  - [x] **Prompt (AC 1, use verbatim — this is the exact text `run_narrative.py` sends today, confirmed by reading it; do not invent a different one)**:
     ```
     Generate the onboarding plan for employee '{employeeName}' (email {employeeEmail}) with profile '{profileId}' on project '{projectId}'. Use the load_profile and load_project tools to get the data and then generate_onboarding_plan to produce a detailed step by step plan in Markdown. Show me the checklist.
     ```
-  - [ ] **Bootstrap session id (AC 4):** generate a fresh `crypto.randomUUID()` inside `agentCoreClient.ts` for each generation call — 36 characters, clears the 33+ character `runtimeSessionId` minimum. It is **never** the onboarding's eventual real id (which doesn't exist yet — `routes/onboardings.ts` assigns `id: crypto.randomUUID()` to the record only *after* `runNarrative` resolves), never persisted, never reused. This is safe specifically because generation is single-turn with no Memory continuity requirement — resolves the "bootstrap session id" item `addendum.md` flagged as open for architecture.
-  - [ ] **Payload (JSON, UTF-8-encoded via `new TextEncoder().encode(...)` into the `payload` field, matching `addendum.md`'s confirmed contract):**
+  - [x] **Bootstrap session id (AC 4):** generate a fresh `crypto.randomUUID()` inside `agentCoreClient.ts` for each generation call — 36 characters, clears the 33+ character `runtimeSessionId` minimum. It is **never** the onboarding's eventual real id (which doesn't exist yet — `routes/onboardings.ts` assigns `id: crypto.randomUUID()` to the record only *after* `runNarrative` resolves), never persisted, never reused. This is safe specifically because generation is single-turn with no Memory continuity requirement — resolves the "bootstrap session id" item `addendum.md` flagged as open for architecture.
+  - [x] **Payload (JSON, UTF-8-encoded via `new TextEncoder().encode(...)` into the `payload` field, matching `addendum.md`'s confirmed contract):**
     ```json
     { "prompt": "<the prompt above>", "userId": "backoffice-manager", "sessionId": "<bootstrap session id>", "modelId": "anthropic.claude-haiku-4-5", "modelApi": "messages" }
     ```
     (`guardrailId`/`guardrailVersion`/`guardrailEnabled` are optional per the confirmed contract — omit them for this story; nothing here requires guardrail configuration.)
-  - [ ] Call `client.send(new InvokeAgentRuntimeCommand({ agentRuntimeArn, runtimeSessionId: sessionId, payload }))` — `runtimeSessionId` passed identically at the top level *and* inside the payload's `sessionId` field (both required, confirmed by the reference Python client at `dayone/agentcore/chatapp/app/agentcore/client.py`).
-  - [ ] **Stream parsing — read `response.response` (the streaming body) as chunks, incrementally UTF-8-decode (Node's `TextDecoder` with `{ stream: true }`, mirroring the reference client's incremental-decoder pattern), split on `\n`, parse each non-empty line as JSON.** For each parsed line: `{"error": true, "message": ...}` → the agent's own reported failure, treat as `{ ok: false, error: message }` and stop; `event.contentBlockDelta.delta.text` → accumulate into the running narrative string AND emit `{ type: "text", text, complete: false }` via `onEvent` (emit one final `{ type: "text", text: "", complete: true }` once the stream ends); `event.contentBlockDelta.delta.reasoningContent.text` → emit `{ type: "reasoning", text }`; `{"type": "tool_use", "tool_name": ...}` → emit `{ type: "tool_call", tool: tool_name, count }` (increment a local counter per call, same pattern as the old bridge's `tool_count`); `{"usage": ..., "metrics": ...}` → log server-side (`console.log`/similar) only, no `ProgressEvent` emitted. Skip anything else (this deployment uses Anthropic Claude via the Messages API, not Nova — the reference Python client's Nova-specific XML-stripping branches don't apply and shouldn't be ported).
-  - [ ] **The final `narrative` is the accumulated `text`-delta string** — there is no separate "final answer" field in the response; the deployed agent (`dayone/agentcore/agent/my_agent.py`) only yields incremental deltas. If no text was ever accumulated and no error line arrived, return `{ ok: false, error: "Agent stream ended without producing a response" }`.
-  - [ ] Wrap the whole `client.send(...)` + stream-read in `try/catch` — catch SDK-level exceptions (`ValidationException`, `ThrottlingException`, `InternalServerException`/similar, per the Node SDK's typed error classes) and any other error, converting to `{ ok: false, error: ... }`. Never let this function throw past its own boundary — its callers (the SSE route handler) rely on the discriminated result, not try/catch, per this project's fallible-async-operation convention.
-- [ ] Task 3: Wire it in (AC: 1, 2)
-  - [ ] In `backend/src/routes/onboardings.ts`, change the import from `import { runNarrative, ProgressEvent } from "../pythonBridge";` to `import { runNarrative } from "../agentCoreClient"; import { ProgressEvent } from "../types";` (import `ProgressEvent` directly from `types.ts` now — no need for the pass-through re-export the old bridge module did). No other change to this file for this story — the call site (`await runNarrative({ employeeName, employeeEmail, profileId, projectId }, onEvent)`) is unchanged.
-- [ ] Task 4: Update setup docs (AC: 1)
-  - [ ] In `README.md`, update the "Prerequisites"/"Running it" sections: remove the `dayone/.venv`, `BEDROCK_MODEL_ID`, and Python-subprocess-specific setup instructions; note that AWS credentials now need Bedrock AgentCore invoke permissions directly from this Node process (same `AWS_PROFILE`/`AWS_REGION` env vars the SDK's default credential chain already picks up — no new env-var wiring required beyond what's already documented). `DAYONE_REPO_PATH` stays relevant (still used by `catalog.ts` to read `profiles/*.yaml`/`projects/*.yaml` directly) but is no longer used for spawning Python.
-- [ ] Task 5: Verify (AC: 1–8)
-  - [ ] `npm run build`/`typecheck` in `backend/` (this will surface any AWS SDK type mismatches immediately).
-  - [ ] Manually create an onboarding against the real deployed runtime, confirm the narrative renders correctly in the detail view exactly as before, and that tool-call/reasoning/text progress events stream live in `CreateOnboardingPage`'s console exactly as they did with the old subprocess bridge.
-  - [ ] Confirm no reference to `pythonBridge`/`run_narrative.py` remains anywhere (`grep -rn "pythonBridge\|run_narrative" backend/`).
+  - [x] Call `client.send(new InvokeAgentRuntimeCommand({ agentRuntimeArn, runtimeSessionId: sessionId, payload }))` — `runtimeSessionId` passed identically at the top level *and* inside the payload's `sessionId` field (both required, confirmed by the reference Python client at `dayone/agentcore/chatapp/app/agentcore/client.py`).
+  - [x] **Stream parsing — read `response.response` (the streaming body) as chunks, incrementally UTF-8-decode (Node's `TextDecoder` with `{ stream: true }`, mirroring the reference client's incremental-decoder pattern), split on `\n`, parse each non-empty line as JSON.** For each parsed line: `{"error": true, "message": ...}` → the agent's own reported failure, treat as `{ ok: false, error: message }` and stop; `event.contentBlockDelta.delta.text` → accumulate into the running narrative string AND emit `{ type: "text", text, complete: false }` via `onEvent` (emit one final `{ type: "text", text: "", complete: true }` once the stream ends); `event.contentBlockDelta.delta.reasoningContent.text` → emit `{ type: "reasoning", text }`; `{"type": "tool_use", "tool_name": ...}` → emit `{ type: "tool_call", tool: tool_name, count }` (increment a local counter per call, same pattern as the old bridge's `tool_count`); `{"usage": ..., "metrics": ...}` → log server-side (`console.log`/similar) only, no `ProgressEvent` emitted. Skip anything else (this deployment uses Anthropic Claude via the Messages API, not Nova — the reference Python client's Nova-specific XML-stripping branches don't apply and shouldn't be ported).
+  - [x] **The final `narrative` is the accumulated `text`-delta string** — there is no separate "final answer" field in the response; the deployed agent (`dayone/agentcore/agent/my_agent.py`) only yields incremental deltas. If no text was ever accumulated and no error line arrived, return `{ ok: false, error: "Agent stream ended without producing a response" }`.
+  - [x] Wrap the whole `client.send(...)` + stream-read in `try/catch` — catch SDK-level exceptions (`ValidationException`, `ThrottlingException`, `InternalServerException`/similar, per the Node SDK's typed error classes) and any other error, converting to `{ ok: false, error: ... }`. Never let this function throw past its own boundary — its callers (the SSE route handler) rely on the discriminated result, not try/catch, per this project's fallible-async-operation convention.
+- [x] Task 3: Wire it in (AC: 1, 2)
+  - [x] In `backend/src/routes/onboardings.ts`, change the import from `import { runNarrative, ProgressEvent } from "../pythonBridge";` to `import { runNarrative } from "../agentCoreClient"; import { ProgressEvent } from "../types";` (import `ProgressEvent` directly from `types.ts` now — no need for the pass-through re-export the old bridge module did). No other change to this file for this story — the call site (`await runNarrative({ employeeName, employeeEmail, profileId, projectId }, onEvent)`) is unchanged.
+- [x] Task 4: Update setup docs (AC: 1)
+  - [x] In `README.md`, update the "Prerequisites"/"Running it" sections: remove the `dayone/.venv`, `BEDROCK_MODEL_ID`, and Python-subprocess-specific setup instructions; note that AWS credentials now need Bedrock AgentCore invoke permissions directly from this Node process (same `AWS_PROFILE`/`AWS_REGION` env vars the SDK's default credential chain already picks up — no new env-var wiring required beyond what's already documented). `DAYONE_REPO_PATH` stays relevant (still used by `catalog.ts` to read `profiles/*.yaml`/`projects/*.yaml` directly) but is no longer used for spawning Python.
+- [x] Task 5: Verify (AC: 1–8)
+  - [x] `npm run build`/`typecheck` in `backend/` (this will surface any AWS SDK type mismatches immediately).
+  - [x] Manually create an onboarding against the real deployed runtime, confirm the narrative renders correctly in the detail view exactly as before, and that tool-call/reasoning/text progress events stream live in `CreateOnboardingPage`'s console exactly as they did with the old subprocess bridge.
+  - [x] Confirm no reference to `pythonBridge`/`run_narrative.py` remains anywhere (`grep -rn "pythonBridge\|run_narrative" backend/`).
 
 ## Dev Notes
 
@@ -84,4 +88,34 @@ so that generation is production-grade and reliable, and doesn't depend on a loc
 
 ### Completion Notes List
 
+- Replaced the Python subprocess bridge with the AWS AgentCore Runtime SDK at version 3.1092.0 and preserved the existing narrative result interface.
+- Added the exact generation prompt/payload, fresh bootstrap sessions, SSE/NDJSON stream parsing, progress-event translation, usage/metrics logging, and safe error handling.
+- Removed the local Python bridge, wired the route to the new client, added a delete-mid-stream finalization guard, and updated README setup/architecture documentation.
+- Validation passed: backend typecheck/build, mocked SSE/NDJSON harness, live AgentCore smoke test (3,266-character narrative and 299 progress events), and subprocess-reference scan.
+
+- Added Node built-in parser tests covering split SSE/NDJSON events, UTF-8 boundaries, errors, empty streams, and usage/metrics handling.
+- Added a 120-second abortable AgentCore timeout and cancellation when the SSE client disconnects or the onboarding is deleted.
+
 ### File List
+
+- `README.md`
+- `backend/package.json`
+- `backend/package-lock.json`
+- `backend/src/agentCoreClient.ts`
+- `backend/src/agentCoreClient.test.ts`
+- `backend/src/routes/onboardings.ts`
+- `backend/src/pythonBridge.ts` (deleted)
+- `backend/python-bridge/run_narrative.py` (deleted)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/2-1-replace-subprocess-with-agentcore-runtime-sdk-for-plan-generation.md`
+
+### Change Log
+
+- 2026-07-21: Replaced subprocess plan generation with AgentCore Runtime SDK integration and marked story ready for review.
+- 2026-07-21: Resolved code review findings with timeout/cancellation guards and committed parser tests.
+
+### Review Findings
+
+- [x] [Review][Decision] Add committed automated tests for the AgentCore stream parser — Decision: use Node's built-in test runner with minimal testability refactoring; do not add Jest or Vitest.
+- [x] [Review][Patch] Add a client-side timeout and abort handling for stalled AgentCore invocations [backend/src/agentCoreClient.ts:14,176-202] — Added a 120-second abortable timeout around SDK invocation and stream consumption.
+- [x] [Review][Patch] Cancel in-flight generation when the SSE client disconnects [backend/src/routes/onboardings.ts:53-88] — Propagated an AbortSignal from the SSE response and skipped finalization after disconnect or deletion.

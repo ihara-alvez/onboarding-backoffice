@@ -2,7 +2,8 @@ import { Router } from "express";
 import crypto from "crypto";
 import { getProfile, getProject } from "../catalog";
 import { buildOnboardingPlan } from "../planBuilder";
-import { runNarrative, NarrativeArgs, NarrativeOutcome, ProgressEvent } from "../pythonBridge";
+import { runNarrative, NarrativeArgs, NarrativeOutcome } from "../agentCoreClient";
+import { ProgressEvent } from "../types";
 import {
   listOnboardings,
   getOnboarding,
@@ -50,24 +51,39 @@ async function streamGeneration(
   });
 
   const collectedEvents: ProgressEvent[] = [];
+  const abortController = new AbortController();
+  let disconnected = false;
+  const handleDisconnect = () => {
+    disconnected = true;
+    abortController.abort();
+  };
+  res.once("close", handleDisconnect);
   const onEvent = (event: ProgressEvent) => {
     collectedEvents.push(event);
     sseWrite(res, "progress", event);
   };
 
   try {
-    const narrativeOutcome = await runNarrative(args, onEvent);
+    const narrativeOutcome = await runNarrative(args, onEvent, abortController.signal);
+    if (disconnected || abortController.signal.aborted) return;
     const record = buildRecord(narrativeOutcome, collectedEvents);
     sseWrite(res, "done", record);
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unable to generate onboarding";
-    onError(error, collectedEvents);
+    try {
+      onError(error, collectedEvents);
+    } catch {
+      // The record may have been deleted while the initial AgentCore stream was active.
+    }
     try {
       sseWrite(res, "error", { error });
     } finally {
       res.end();
     }
     return;
+  }
+  finally {
+    res.off("close", handleDisconnect);
   }
   res.end();
 }
