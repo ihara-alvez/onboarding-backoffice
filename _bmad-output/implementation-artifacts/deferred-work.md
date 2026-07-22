@@ -49,3 +49,8 @@
 ## Deferred from: code review of 1-8-full-action-log-display-immutability-guarantee (2026-07-21)
 
 - Delete actions are not audited; deferred because implementing this requires cross-record audit storage beyond this story's scope.
+
+## Deferred from: code review of 2-4/2-5/2-6-chat-ui-and-audit (2026-07-22)
+
+- Backend never locks `/approve` or `/send-for-approval` against a concurrent `/chat` request — pre-existing gap in Story 2.3's already-merged code (`backend/src/routes/onboardings.ts`). Frontend's new mutual-exclusion closes the practical UI path to it, but a direct API call could still race the server-side state. Cross-track backend concurrency work, not blocking the Track B UI PR.
+- Zero regression coverage for the SSE error-shape bug this review found and fixed — this project's test convention (`node:test` via `tsx --test`) doesn't yet cover HTTP routes at all, only pure functions. Adding route-level test coverage is a separate testing-infrastructure investment.

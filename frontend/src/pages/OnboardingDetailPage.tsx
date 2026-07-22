@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -7,9 +7,10 @@ import {
   getOnboarding,
   markCompleted,
   retryGeneration,
+  sendChatMessage,
   sendForApproval,
 } from "../api/client";
-import type { OnboardingRecord, OnboardingStatus } from "../api/types";
+import type { OnboardingRecord, OnboardingStatus, ProgressEvent } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Chip } from "../components/Chip";
@@ -18,6 +19,7 @@ import { IconButton } from "../components/IconButton";
 import { Markdown } from "../components/Markdown";
 import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
+import { TextField } from "../components/TextField";
 import { TrashIcon } from "../components/TrashIcon";
 import { isApprovedStatus, statusTone } from "../statusDisplay";
 
@@ -86,8 +88,21 @@ export function OnboardingDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [chatEvents, setChatEvents] = useState<ProgressEvent[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const currentIdRef = useRef(id);
 
   useEffect(() => {
+    // Track the current onboarding id so an in-flight chat send (or its
+    // progress callback) started against a previous id can detect a
+    // navigation away and skip applying its result to the wrong record.
+    currentIdRef.current = id;
+    setChatMessage("");
+    setChatEvents([]);
+    setChatError(null);
+    setSendingChat(false);
     if (!id) return;
     getOnboarding(id)
       .then(setRecord)
@@ -164,6 +179,40 @@ export function OnboardingDetailPage() {
     }
   }
 
+  async function handleSendChat() {
+    const trimmed = chatMessage.trim();
+    if (!id || !trimmed) return;
+    const chatId = id;
+    setSendingChat(true);
+    setChatError(null);
+    setChatEvents([]);
+    try {
+      const updated = await sendChatMessage(chatId, trimmed, (event) => {
+        if (currentIdRef.current !== chatId) return;
+        setChatEvents((prev) => [...prev, event]);
+      });
+      if (currentIdRef.current !== chatId) return;
+      setRecord(updated);
+      setChatMessage("");
+    } catch (err) {
+      if (currentIdRef.current !== chatId) return;
+      setChatError((err as Error).message);
+      // The chat attempt may have failed *after* the backend already
+      // committed a side effect (e.g. reverting pending_approval -> draft
+      // before the agent call even started) — refetch so the page reflects
+      // the true current state rather than the stale one it had before the
+      // attempt, even though the revision itself didn't apply.
+      try {
+        const refreshed = await getOnboarding(chatId);
+        if (currentIdRef.current === chatId) setRecord(refreshed);
+      } catch {
+        // best-effort refresh; the chat error above still surfaces regardless
+      }
+    } finally {
+      if (currentIdRef.current === chatId) setSendingChat(false);
+    }
+  }
+
   if (error) {
     return (
       <div className="p-8">
@@ -178,6 +227,11 @@ export function OnboardingDetailPage() {
 
   const { profile, project } = record;
   const progressEntries = buildProgressEntries(record);
+  // Every status-changing action on this page (including chat, which can
+  // trigger a pending_approval -> draft revert) must block every other one —
+  // otherwise two concurrent requests can race and leave stale UI state.
+  const otherActionInFlight = sendingForApproval || approving || retrying || completing || deleting;
+  const anyActionInFlight = otherActionInFlight || sendingChat;
 
   return (
     <div className="mx-auto max-w-5xl p-8">
@@ -290,6 +344,50 @@ export function OnboardingDetailPage() {
         </Collapsible>
       </Card>
 
+      {record.status !== "blocked" && (
+        <Card className="mb-6">
+          <Collapsible label="Revise plan via chat">
+            {record.status === "draft" || record.status === "pending_approval" ? (
+              <div className="flex flex-col gap-3">
+                <TextField
+                  label="Message"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  disabled={anyActionInFlight}
+                  placeholder="e.g. drop the internal-tools repo, they won't touch it in month one"
+                />
+                <Button
+                  onClick={handleSendChat}
+                  disabled={anyActionInFlight || !chatMessage.trim()}
+                  className="self-start"
+                >
+                  {sendingChat ? "Sending..." : "Send"}
+                </Button>
+                {chatError && <Card tint="error">{chatError}</Card>}
+                {chatEvents.length > 0 && <ProgressLog events={chatEvents} live={sendingChat} />}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-body-medium text-on-surface-variant">
+                  This onboarding has been approved — chat is now read-only.
+                </p>
+                {record.actionLog
+                  .filter((entry) => entry.type === "chat_message")
+                  .map((entry) => (
+                    <div key={entry.id} className="text-body-medium">
+                      <span className="text-on-surface-variant">
+                        {new Date(entry.timestamp).toLocaleString()} &middot;{" "}
+                        {entry.actor === "manager" ? "Manager" : "System"} &middot;{" "}
+                      </span>
+                      <span className="text-on-surface">{entry.message}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </Collapsible>
+        </Card>
+      )}
+
       <Card className="mb-6">
         <SectionTitle>Repositories</SectionTitle>
         <div className="flex flex-col gap-4">
@@ -346,22 +444,22 @@ ${repo.test}`}
 
       <div className="flex items-center gap-3">
         {record.status === "draft" && (
-          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || retrying || completing || deleting}>
+          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || retrying || completing || deleting || sendingChat}>
             {sendingForApproval ? "Sending..." : "Send for approval"}
           </Button>
         )}
         {record.status === "pending_approval" && (
-          <Button onClick={handleApprove} disabled={approving || retrying || completing || deleting}>
+          <Button onClick={handleApprove} disabled={approving || retrying || completing || deleting || sendingChat}>
             {approving ? "Approving..." : "Approve & send to employee"}
           </Button>
         )}
         {record.status === "blocked" && (
-          <Button onClick={handleRetry} disabled={retrying || completing || deleting}>
+          <Button onClick={handleRetry} disabled={retrying || completing || deleting || sendingChat}>
             {retrying ? "Retrying..." : "Retry generation"}
           </Button>
         )}
         {record.status === "in_progress" && (
-          <Button onClick={handleComplete} disabled={completing || retrying || deleting}>
+          <Button onClick={handleComplete} disabled={completing || retrying || deleting || sendingChat}>
             {completing ? "Completing..." : "Mark complete"}
           </Button>
         )}
@@ -370,7 +468,7 @@ ${repo.test}`}
           aria-label="Delete onboarding"
           title="Delete onboarding"
           onClick={handleDelete}
-          disabled={sendingForApproval || approving || retrying || completing || deleting}
+          disabled={sendingForApproval || approving || retrying || completing || deleting || sendingChat}
         >
           <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
         </IconButton>
