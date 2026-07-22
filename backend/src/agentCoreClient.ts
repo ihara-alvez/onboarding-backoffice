@@ -3,7 +3,7 @@ import {
   BedrockAgentCoreClient,
   InvokeAgentRuntimeCommand,
 } from "@aws-sdk/client-bedrock-agentcore";
-import { ProgressEvent } from "./types";
+import type { ProgressEvent } from "./types";
 
 const AGENT_RUNTIME_ARN =
   process.env.AGENT_RUNTIME_ARN ??
@@ -24,6 +24,7 @@ export interface NarrativeArgs {
 }
 
 export type NarrativeOutcome = { ok: true; narrative: string } | { ok: false; error: string };
+export type AgentOutcome = { ok: true; text: string } | { ok: false; error: string };
 
 interface AgentStreamEvent {
   error?: boolean;
@@ -62,13 +63,13 @@ export async function readAgentStream(
   response: unknown,
   onEvent: ((event: ProgressEvent) => void) | undefined,
   signal?: AbortSignal
-): Promise<NarrativeOutcome> {
+): Promise<AgentOutcome> {
   const decoder = new TextDecoder();
   let buffer = "";
-  let narrative = "";
+  let textResult = "";
   let toolCount = 0;
 
-  const processLine = (line: string): NarrativeOutcome | undefined => {
+  const processLine = (line: string): AgentOutcome | undefined => {
     const trimmed = line.trim().replace(/^data:\s*/, "");
     if (!trimmed) return undefined;
 
@@ -87,7 +88,7 @@ export async function readAgentStream(
 
     const text = payload.contentBlockDelta?.delta?.text;
     if (typeof text === "string") {
-      narrative += text;
+      textResult += text;
       emitEvent(onEvent, { type: "text", text, complete: false });
       return undefined;
     }
@@ -138,10 +139,10 @@ export async function readAgentStream(
   buffer += decoder.decode();
   const finalResult = processLine(buffer);
   if (finalResult) return finalResult;
-  if (!narrative) return { ok: false, error: "Agent stream ended without producing a response" };
+  if (!textResult) return { ok: false, error: "Agent stream ended without producing a response" };
 
   emitEvent(onEvent, { type: "text", text: "", complete: true });
-  return { ok: true, narrative };
+  return { ok: true, text: textResult };
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<Uint8Array> {
@@ -168,8 +169,8 @@ export async function runNarrative(
   signal?: AbortSignal
 ): Promise<NarrativeOutcome> {
   const sessionId = crypto.randomUUID();
-  const payload = new TextEncoder().encode(
-    JSON.stringify({
+  const outcome = await invokeAgent(
+    {
       prompt: createPrompt(args),
       userId: USER_ID,
       sessionId,
@@ -178,8 +179,21 @@ export async function runNarrative(
       guardrailId: GUARDRAIL_ID,
       guardrailVersion: GUARDRAIL_VERSION,
       guardrailEnabled: true,
-    })
+    },
+    sessionId,
+    onEvent,
+    signal
   );
+  return outcome.ok ? { ok: true, narrative: outcome.text } : outcome;
+}
+
+export async function invokeAgent(
+  payload: Record<string, unknown>,
+  sessionId: string,
+  onEvent?: (event: ProgressEvent) => void,
+  signal?: AbortSignal
+): Promise<AgentOutcome> {
+  const encodedPayload = new TextEncoder().encode(JSON.stringify(payload));
 
   const timeoutController = new AbortController();
   const timeout = setTimeout(() => timeoutController.abort(), AGENTCORE_TIMEOUT_MS);
@@ -193,7 +207,7 @@ export async function runNarrative(
         agentRuntimeArn: AGENT_RUNTIME_ARN,
         qualifier: RUNTIME_QUALIFIER,
         runtimeSessionId: sessionId,
-        payload,
+        payload: encodedPayload,
       }),
       { abortSignal: timeoutController.signal }
     );
