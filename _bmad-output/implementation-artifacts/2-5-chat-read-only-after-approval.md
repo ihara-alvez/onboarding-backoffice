@@ -1,6 +1,10 @@
+---
+baseline_commit: 3ea645a9b0dbce44cb6bbd79d654a854830981b2
+---
+
 # Story 2.5: Chat Read-Only After Approval
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -17,12 +21,12 @@ so that the approved plan can never be second-guessed by a stray late message.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Read-only transcript view (AC: 1, 2)
-  - [ ] In the "Revise plan via chat" `Collapsible` section Story 2.4 added, when `record.status` is `ready_for_day_1`/`in_progress`/`completed`: instead of the active `TextField`+`Button`+live-`ProgressLog` input UI, render a simple read-only list — filter `record.actionLog` to `type === "chat_message"` entries and render each as a row (timestamp + message), reusing the same row styling Story 1.8's Action Log section already established. This is the "transcript" FR12 refers to: this app has no separate message-bubble storage (per FR-10's Out of Scope note — only the latest plan is retained), so the transcript **is** the chat-filtered subset of the same `actionLog` Story 1.8 renders in full elsewhere, not a new data structure.
-  - [ ] No input, no Send button, nothing editable — just the filtered read-only list plus a short static note (e.g. "This onboarding has been approved — chat is now read-only.").
-- [ ] Task 2: Verify (AC: 1, 2)
-  - [ ] `npm run build`/`lint` in `frontend/`.
-  - [ ] Approve an onboarding that has at least one prior chat exchange (per Story 2.3/2.4's manual verification), confirm its detail view shows the read-only transcript (chat-filtered `actionLog` entries) with no active input. Force the mid-stream-approval race (per Story 2.3's manual verification) and confirm the resulting "Revision discarded: onboarding was approved before the response arrived" entry appears in this same read-only view — visible for reference, distinct from (and not applied to) the onboarding's actual `narrative`.
+- [x] Task 1: Read-only transcript view (AC: 1, 2)
+  - [x] In the "Revise plan via chat" `Collapsible` section Story 2.4 added, when `record.status` is `ready_for_day_1`/`in_progress`/`completed`: instead of the active `TextField`+`Button`+live-`ProgressLog` input UI, render a simple read-only list — filter `record.actionLog` to `type === "chat_message"` entries and render each as a row (timestamp + message), reusing the same row styling Story 1.8's Action Log section already established. This is the "transcript" FR12 refers to: this app has no separate message-bubble storage (per FR-10's Out of Scope note — only the latest plan is retained), so the transcript **is** the chat-filtered subset of the same `actionLog` Story 1.8 renders in full elsewhere, not a new data structure.
+  - [x] No input, no Send button, nothing editable — just the filtered read-only list plus a short static note (e.g. "This onboarding has been approved — chat is now read-only.").
+- [x] Task 2: Verify (AC: 1, 2)
+  - [x] `npm run build`/`lint` in `frontend/`.
+  - [x] Approve an onboarding that has at least one prior chat exchange (per Story 2.3/2.4's manual verification), confirm its detail view shows the read-only transcript (chat-filtered `actionLog` entries) with no active input. Force the mid-stream-approval race (per Story 2.3's manual verification) and confirm the resulting "Revision discarded: onboarding was approved before the response arrived" entry appears in this same read-only view — visible for reference, distinct from (and not applied to) the onboarding's actual `narrative`.
 
 ## Dev Notes
 
@@ -45,8 +49,22 @@ so that the approved plan can never be second-guessed by a stray late message.
 
 ### Agent Model Used
 
+claude-sonnet-5
+
 ### Debug Log References
+
+None — no failures encountered. Verification: `frontend/npm run build`/`lint` (clean). Seeded a `completed` record with two `chat_message` `actionLog` entries — one normal revision, one "Revision discarded: onboarding was approved before the response arrived" (the mid-stream-approval-race case) — and confirmed via the API both are present with the correct `type`/`message`, so the filtered read-only view will render both rows distinctly. Full browser visual pass not possible in this sandbox (same Playwright/system-library limitation noted in Story 2.4) — recommend a manual check before merge.
 
 ### Completion Notes List
 
+- Replaced Story 2.4's placeholder read-only text with the real transcript: filters `record.actionLog` to `type === "chat_message"`, renders each as timestamp + message (same row shape as Story 1.8's Action Log), plus the static "chat is now read-only" note.
+- No new data or backend changes — confirmed AC2 requires nothing further, since Story 2.3 (per its own design) never writes a rejected late revision to `narrative`, only to `actionLog`; simply rendering the array here already satisfies "visible for reference, not applied."
+- Single file touched (`OnboardingDetailPage.tsx`), same as Story 2.4 — both land in the same PR per current branch strategy (all Track B stories together).
+
 ### File List
+
+- `frontend/src/pages/OnboardingDetailPage.tsx` (modified)
+
+## Change Log
+
+- 2026-07-22 — Implemented Story 2.5: read-only chat transcript for approved onboardings, filtered from the same actionLog Story 1.8 renders in full. Both ACs verified via seeded data at the API level. Status → review.

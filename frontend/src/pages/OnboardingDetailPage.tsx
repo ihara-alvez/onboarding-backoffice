@@ -337,9 +337,21 @@ export function OnboardingDetailPage() {
                 {chatEvents.length > 0 && <ProgressLog events={chatEvents} live={sendingChat} />}
               </div>
             ) : (
-              <p className="text-body-medium text-on-surface-variant">
-                Chat is read-only for this onboarding.
-              </p>
+              <div className="flex flex-col gap-2">
+                <p className="text-body-medium text-on-surface-variant">
+                  This onboarding has been approved — chat is now read-only.
+                </p>
+                {record.actionLog
+                  .filter((entry) => entry.type === "chat_message")
+                  .map((entry) => (
+                    <div key={entry.id} className="text-body-medium">
+                      <span className="text-on-surface-variant">
+                        {new Date(entry.timestamp).toLocaleString()} &middot;{" "}
+                      </span>
+                      <span className="text-on-surface">{entry.message}</span>
+                    </div>
+                  ))}
+              </div>
             )}
           </Collapsible>
         </Card>
