@@ -50,6 +50,23 @@
 
 - Delete actions are not audited; deferred because implementing this requires cross-record audit storage beyond this story's scope.
 
+## Deferred from: code review of 3-1-header-action-bar-always-visible-status-aware-actions (2026-07-23)
+
+- In-flight action state (`approving`/`sendingForApproval`/`retrying`/`completing`) is not reset when navigating to a different onboarding (`id` changes) — pre-existing gap in the `[id]` effect (only chat state is reset there), not introduced by Story 3.1.
+- Approve/SendForApproval/Complete handlers have no internal `record.status` guard, relying solely on the `disabled` HTML attribute plus server-side rejection (Stories 1.3/1.4/1.5) as defense-in-depth. Low actual risk since the backend already validates status transitions.
+
+## Deferred from: code review of 3-2-progress-stepper-alignment-fix (2026-07-23)
+
+- Progress stepper has no `role="list"`/`aria-current="step"` semantics for assistive tech — real accessibility gap, out of scope for a pure layout/alignment fix; candidate for a future accessibility pass across the app.
+
+## Deferred from: code review of 3-3-header-meta-links-project-badge-view-history-download-plan (2026-07-23)
+
+- "Download plan" link ignores `record.status` — a `blocked` record could produce an empty/unhelpful download; gating it needs a product decision on which statuses should disable/warn, out of this story's scope.
+- `HistoryModal` has no Tab/Shift+Tab focus trap — real accessibility gap in this first-modal-in-the-codebase, but a full focus trap is a bigger addition than this story's stated accessibility scope. Flagged since later modals will likely copy this pattern.
+- `historyOpen` is not reset when the route's `id` param changes — same class of pre-existing gap already deferred in Story 3.1 (other in-flight state not reset on `id` change in the same effect).
+- Backdrop click can close the modal mid-text-selection-drag — real but rare/minor.
+- `HistoryModal` isn't rendered via a portal — currently harmless, no clipping ancestor exists, but a latent fragility if that ever changes; no portal precedent exists elsewhere in the codebase.
+
 ## Deferred from: code review of 2-4/2-5/2-6-chat-ui-and-audit (2026-07-22)
 
 - Backend never locks `/approve` or `/send-for-approval` against a concurrent `/chat` request — pre-existing gap in Story 2.3's already-merged code (`backend/src/routes/onboardings.ts`). Frontend's new mutual-exclusion closes the practical UI path to it, but a direct API call could still race the server-side state. Cross-track backend concurrency work, not blocking the Track B UI PR.

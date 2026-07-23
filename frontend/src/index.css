@@ -2,30 +2,30 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-  /* MD3 color roles — baseline purple tonal palette, DARK scheme */
-  --color-primary: #d0bcff;
-  --color-on-primary: #381e72;
-  --color-primary-container: #4f378b;
-  --color-on-primary-container: #eaddff;
+  /* Company light theme: blue product accent, neutral workspace surfaces. */
+  --color-primary: #2457d6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #e7edff;
+  --color-on-primary-container: #173b9a;
 
-  --color-secondary: #ccc2dc;
-  --color-on-secondary: #332d41;
-  --color-secondary-container: #4a4458;
-  --color-on-secondary-container: #e8def8;
+  --color-secondary: #667085;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #eef2f7;
+  --color-on-secondary-container: #344054;
 
-  --color-surface: #141218;
-  --color-surface-container: #211f26;
-  --color-on-surface: #e6e1e5;
-  --color-surface-variant: #49454f;
-  --color-on-surface-variant: #cac4d0;
+  --color-surface: #f7f8fb;
+  --color-surface-container: #ffffff;
+  --color-on-surface: #101828;
+  --color-surface-variant: #f0f2f5;
+  --color-on-surface-variant: #667085;
 
-  --color-error: #f2b8b5;
-  --color-on-error: #601410;
-  --color-error-container: #8c1d18;
-  --color-on-error-container: #f9dede;
+  --color-error: #b42318;
+  --color-on-error: #ffffff;
+  --color-error-container: #fee4e2;
+  --color-on-error-container: #912018;
 
-  --color-outline: #938f99;
-  --color-outline-variant: #49454f;
+  --color-outline: #98a2b3;
+  --color-outline-variant: #e4e7ec;
 
   /* MD3 shape scale */
   --radius-xs: 4px;
@@ -49,9 +49,9 @@
   --line-height-label-large: 20px;
 
   /* MD3 elevation, approximated via box-shadow */
-  --shadow-elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
-  --shadow-elevation-2: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
-  --shadow-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.3), 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --shadow-elevation-1: 0px 1px 2px 0px rgba(16, 24, 40, 0.05), 0px 1px 3px 1px rgba(16, 24, 40, 0.04);
+  --shadow-elevation-2: 0px 2px 4px 0px rgba(16, 24, 40, 0.06), 0px 4px 12px 0px rgba(16, 24, 40, 0.05);
+  --shadow-elevation-3: 0px 4px 8px 0px rgba(16, 24, 40, 0.08), 0px 8px 20px 0px rgba(16, 24, 40, 0.06);
 }
 
 body {

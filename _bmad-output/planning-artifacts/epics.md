@@ -5,6 +5,8 @@ inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-onboarding-backoffice-2026-07-17/addendum.md
   - /home/ialvez/workspace/dayone/docs/ARCHITECTURE.md
   - _bmad-output/planning-artifacts/prds/prd-onboarding-backoffice-2026-07-17/reconcile-architecture.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-onboarding-backoffice-2026-07-23/EXPERIENCE.md
 ---
 
 # onboarding-backoffice - Epic Breakdown
@@ -75,7 +77,35 @@ NFR4: The Action Log can attribute an action to "a manager" and a timestamp but 
 
 ### UX Design Requirements
 
-No dedicated UX design contract exists for this PRD (confirmed with the user — proceeding without one). UI/interaction acceptance criteria for the Manager Revision Chat and status-driven detail view are derived directly from the PRD's own FRs, which already specify concrete interaction states: chat entry-point visibility per status (FR9), disabled input while streaming (FR11), read-only chat post-approval (FR12), and Requested-vs-Approved permission labeling (FR6). No separate UX-DR items are tracked; stories should cite the relevant FR directly for interaction acceptance criteria.
+No dedicated UX design contract existed for Epic 1/2 (confirmed with the user — proceeding without one at the time). UI/interaction acceptance criteria for the Manager Revision Chat and status-driven detail view were derived directly from the PRD's own FRs, which already specified concrete interaction states: chat entry-point visibility per status (FR9), disabled input while streaming (FR11), read-only chat post-approval (FR12), and Requested-vs-Approved permission labeling (FR6).
+
+**Epic 3 introduces the project's first dedicated UX design contract** — a `bmad-ux` spine pair (`ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md` + `EXPERIENCE.md`), scoped to a redesign of the onboarding detail/workspace page. Unlike Epic 1/2, Epic 3 has no new FRs/NFRs behind it (no PRD change) — it is driven entirely by this UX spine, extracted below as UX-DR items:
+
+UX-DR1: Header action bar shows Approve-slot, Complete, and Delete at all times, each individually enabled/disabled per the record's status; Retry renders only when status is `blocked`. The Approve-slot swaps label and handler by status ("Send for approval"/`handleSendForApproval` in `draft`, "Approve & send to employee"/`handleApprove` from `pending_approval` on), and swaps Button variant (filled when applicable, outlined+disabled when not) rather than just dimming opacity.
+
+UX-DR2: Fix the Onboarding progress stepper's dot/label alignment (centered, not left-aligned) so the connector line between stages visually meets the dot centers — a real bug in the currently shipped `ProgressCard`.
+
+UX-DR3: Replace the Onboarding narrative, Activity/action-log, and Full-plan cards with: a "Project" badge (project name) under the header subline, a "View history" link opening a client-side modal/drawer listing the full Action Log, and a "Download plan (.md)" link that downloads `record.narrative ?? record.plan` as a `.md` file via a client-side Blob/`URL.createObjectURL` — no new backend endpoint for either.
+
+UX-DR4: Reorder and restructure the detail page's main content into nine cards, in this order: Progress, First tasks (`project.first_tasks`), Onboarding context (business goal + architecture summary + a Details sub-section carrying `profile.summary`/`startDate`/`buddyEmail`/`seniority`/`location`/`notes`, each conditionally shown), Repositories (table: Repository/Access/Setup), Permissions (table: Permission/System/Included, replacing grouped chips), Checklists (Day 1 + Week 1), Suggested documentation, Approvals and risks.
+
+UX-DR5: Implement a "Viewed" checkbox on every card except Progress — checking it collapses the card to a single-line bar (real component state, e.g. a `Set` of viewed card ids; not a CSS-only trick). Unchecking re-expands. This state is local UI state only, not persisted to `OnboardingRecord`.
+
+UX-DR6: Adopt Heroicons (outline, 24×24 viewBox, stroke-width 1.5) as a new icon-library dependency, replacing the hand-drawn `TrashIcon.tsx` and the hand-drawn Search/Bell SVGs in `TopAppBar.tsx`; also used for the new Download-plan, View-history, and dark-mode-toggle icons.
+
+UX-DR7: Add a dark-mode token set and a header sun/moon toggle (between Search and Notifications) that switches the whole page's color tokens; the toggle overrides OS `prefers-color-scheme` once the user sets it explicitly, persisted client-side, otherwise follows system preference by default.
+
+UX-DR8: Add a new semantic `success` color token (light `#16a34a` / dark `#4ade80`), used only for the Viewed-checkbox's checked state and the Permissions table's "Included" tick — a UI-accent/glyph use, never text.
+
+UX-DR9: Confirm — no code change expected — that the Plan chat panel remains `position:sticky` while the now-longer main column scrolls; already correct in the shipped `OnboardingDetailPage.tsx`.
+
+UX-DR10: Every color pair (light and dark), including the new `success`/`review-container` tokens, must meet WCAG AA text contrast at the sizes used; `success` is held to the 3:1 non-text bar since it's UI-accent-only. All new interactive elements (header action buttons, header meta links, dark-mode toggle, Viewed checkboxes) must show a visible focus ring and be reachable/operable via keyboard alone. A collapsed (Viewed) card's body must be genuinely removed from the accessibility tree (not just visually hidden), so screen readers don't read collapsed content.
+
+**Epic 3 — Additional Requirements (technical, not from an Architecture.md — none exists for this change):**
+
+- New npm dependency: `@heroicons/react` (or an equivalent Heroicons-outline SVG set) added to the frontend — a real dependency-management decision (version pin, bundle size, license check), not a trivial visual swap.
+- No new backend endpoints anywhere in this epic — "View history" and "Download plan" both operate client-side on data the detail view already fetches (`record.actionLog`, `record.narrative`/`record.plan`).
+- Roles/permissions model is explicitly out of scope/deferred (`EXPERIENCE.md` Open Questions) — no login system exists today; this epic keeps the page role-agnostic exactly as shipped.
 
 ### FR Coverage Map
 
@@ -109,6 +139,12 @@ Manager can see and control an onboarding's real-world status end-to-end — aut
 Plan generation moves off the local Python subprocess onto the deployed AgentCore Runtime, and — built on that same connection — a manager gains a chat panel to conversationally revise a plan before approving it, with live streaming and full audit logging.
 **FRs covered:** FR9, FR10, FR11, FR12, FR13, FR14, FR15, FR16
 **NFRs covered:** NFR2
+
+### Epic 3: Onboarding Detail Page Redesign
+
+Redesigns the onboarding detail/workspace page per the project's first UX design contract (`ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md` + `EXPERIENCE.md`): an always-visible, status-aware header action bar; a progress-stepper alignment fix; a nine-card content structure with a GitHub-PR-style "Viewed" collapse pattern replacing the old Narrative/Activity/Full-plan cards; a Heroicons icon-library adoption; and full dark-mode support.
+**UX-DRs covered:** UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR5, UX-DR6, UX-DR7, UX-DR8, UX-DR9, UX-DR10
+**FRs/NFRs covered:** none (no PRD change — this epic is UX-spine-driven)
 
 ---
 
@@ -481,3 +517,259 @@ So that plan revisions are just as auditable as status changes and approvals.
 **Given** a late revision is discarded because the onboarding was approved mid-stream (Story 2.3)
 **When** the Action Log is viewed
 **Then** an entry records the rejected late revision, distinct from a normally-applied one
+
+---
+
+## Epic 3: Onboarding Detail Page Redesign
+
+Redesigns the onboarding detail/workspace page per the project's first UX design contract (`ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md` + `EXPERIENCE.md`): an always-visible, status-aware header action bar; a progress-stepper alignment fix; a nine-card content structure with a GitHub-PR-style "Viewed" collapse pattern replacing the old Narrative/Activity/Full-plan cards; a Heroicons icon-library adoption; and full dark-mode support.
+
+**Parallelization note:** Stories 3.1–3.3 (header actions, stepper fix, header meta links) touch different parts of `OnboardingDetailPage.tsx`/`TopAppBar.tsx` and can proceed in parallel. Story 3.4 (icon library) depends on 3.1 and 3.3 having introduced the icon usages it replaces/completes. Stories 3.5–3.6 (data tables, card restructure) are the core content-restructuring work and should land before 3.7 (Viewed-checkbox, which wraps the resulting cards). Story 3.8 (dark mode) lands last — it depends on 3.7's `success` token existing so it can extend it to a dark variant, and benefits from every other visual change already being in place to re-theme.
+
+### Story 3.1: Header Action Bar — Always-Visible Status-Aware Actions
+
+As a manager,
+I want Approve, Complete, and Delete always present in the header — enabled or disabled based on the onboarding's current status — instead of only the one currently-valid action appearing,
+So that I always see the full set of lifecycle actions and understand at a glance which ones apply right now.
+
+**Acceptance Criteria:**
+
+**Given** an onboarding in `draft`
+**When** the detail view renders
+**Then** the Approve-slot button shows label "Send for approval", is enabled, and calls `handleSendForApproval`; Complete renders disabled (outlined variant); Retry does not render; Delete renders enabled (subject to the existing `anyActionInFlight` guard)
+
+**Given** an onboarding in `pending_approval`
+**When** the detail view renders
+**Then** the Approve-slot button shows label "Approve & send to employee", is enabled, and calls `handleApprove`; Complete renders disabled (outlined variant); Retry does not render
+
+**Given** an onboarding in `ready_for_day_1` or `completed`
+**When** the detail view renders
+**Then** both the Approve-slot and Complete buttons render disabled (outlined variant); Retry does not render
+
+**Given** an onboarding in `in_progress`
+**When** the detail view renders
+**Then** the Approve-slot button renders disabled (outlined variant); Complete renders enabled (filled variant) and calls `handleComplete`; Retry does not render
+
+**Given** an onboarding in `blocked`
+**When** the detail view renders
+**Then** both Approve-slot and Complete render disabled (outlined variant); Retry renders enabled (filled variant) and calls `handleRetry` — the only status where Retry appears
+
+**Given** the currently-applicable action in the Approve-slot/Complete pair (or Retry, when shown)
+**When** it renders
+**Then** it uses the Button component's filled variant; the inapplicable member of the pair renders the outlined variant, disabled — not the same filled button dimmed by opacity alone
+
+**Given** any action (approve/send-for-approval/retry/complete/delete/chat-send) is in flight
+**When** Delete is evaluated
+**Then** it is disabled, matching today's `anyActionInFlight` guard — unchanged behavior
+
+**Given** the manager clicks Delete
+**When** the click is handled
+**Then** the existing `window.confirm()` guard still fires before deletion proceeds — unchanged
+
+### Story 3.2: Progress Stepper Alignment Fix
+
+As a manager,
+I want the connecting line between progress-stepper stages to visually meet the stage dots,
+So that the timeline reads as one continuous progression instead of a misaligned line and dots.
+
+**Acceptance Criteria:**
+
+**Given** the Onboarding progress card renders
+**When** each stage column lays out its dot and label
+**Then** both are horizontally centered within the column (`align-items: center`), not left-aligned as in the current shipped `ProgressCard`
+
+**Given** two adjacent stage columns
+**When** the connector line between them renders
+**Then** it visually spans from one dot's center to the next dot's center, with no gap or offset, in every stepper state (0 through 5 completed stages)
+
+**Given** this is a pure layout fix
+**When** it ships
+**Then** no change occurs to the stepper's underlying status/data logic (`buildProgressEntries`, stage completion calculation) — visual alignment only
+
+### Story 3.3: Header Meta Links — Project Badge, View History, Download Plan
+
+As a manager,
+I want to see which project this onboarding is for, review the full action history, and download the generated plan, all from the page header,
+So that I don't need the old Narrative, Activity, or Full-plan cards taking up space in the main content column.
+
+**Acceptance Criteria:**
+
+**Given** the detail view header
+**When** it renders
+**Then** a "Project" badge showing `record.project.name` appears under the employee email/role subline
+
+**Given** the header's meta-links row
+**When** it renders
+**Then** it shows two links: "View history" and "Download plan (.md)", both under the Project badge
+
+**Given** the manager clicks "View history"
+**When** the click is handled
+**Then** a client-side modal/drawer opens listing the full `record.actionLog` (timestamp, actor, message, in chronological order) — the same content the old `ActionLogCard` rendered — with no new backend route or endpoint
+
+**Given** the manager clicks "Download plan (.md)"
+**When** the click is handled
+**Then** a `.md` file download is triggered client-side (Blob + `URL.createObjectURL`) containing `record.narrative ?? record.plan` (the same fallback `FullPlanCard` used), named `<employee-slug>-onboarding-plan.md`, with no new backend endpoint
+
+**Given** this story ships
+**When** the page renders
+**Then** the old Onboarding narrative card, Activity/action-log card, and Full-plan card no longer render anywhere on the page
+
+### Story 3.4: Heroicons Icon Library Adoption
+
+As a manager,
+I want the header and Delete icons to use a consistent, professional icon set,
+So that the interface reads as polished rather than a mix of hand-drawn shapes.
+
+**Acceptance Criteria:**
+
+**Given** the frontend's dependencies
+**When** this story ships
+**Then** `@heroicons/react` (or an equivalent Heroicons-outline SVG set) is added as a real, version-pinned dependency
+
+**Given** the Delete icon button
+**When** it renders
+**Then** it uses the Heroicons outline Trash icon, replacing the hand-drawn `TrashIcon.tsx`; `TrashIcon.tsx` is removed, not kept as a fallback
+
+**Given** the header's Search and Notifications buttons
+**When** they render
+**Then** they use Heroicons outline MagnifyingGlass and Bell icons, replacing the hand-drawn inline SVGs in `TopAppBar.tsx`
+
+**Given** the "View history" and "Download plan" links (Story 3.3)
+**When** they render
+**Then** they use Heroicons outline Clock and ArrowDownTray icons respectively
+
+**Given** all adopted icons
+**When** rendered
+**Then** they share one consistent spec: 24×24 viewBox, stroke-width 1.5, round linecap/linejoin — no leftover hand-drawn icon remains alongside them in the redesigned surfaces
+
+### Story 3.5: Repositories & Permissions as Data Tables
+
+As a manager,
+I want Repositories and Permissions each shown as a compact table,
+So that I can scan access and setup information row by row instead of parsing paragraph-style blocks or grouped chips.
+
+**Acceptance Criteria:**
+
+**Given** the Repositories card
+**When** it renders
+**Then** it shows a table with columns Repository | Access | Setup, using the real `bootstrap`/`test` commands from each `ProjectRepo` — no "Last synced" column, since no such field exists on `ProjectRepo`
+
+**Given** the Permissions card
+**When** it renders
+**Then** it shows a table with columns Permission | System | Included, listing every entry from `profile.permissions.aws`, `.repositories`, and `.ci_cd` — replacing the old grouped-chips-by-category layout
+
+**Given** the Permissions card title
+**When** the record's status changes
+**Then** it continues to swap "Requested permissions" ↔ "Approved permissions" via the existing `isApprovedStatus()` check — unchanged behavior, only the layout beneath it changes
+
+**Given** either table's content is wider than its container
+**When** it renders
+**Then** the table scrolls horizontally within its own container (`overflow-x: auto`) and never causes the page itself to scroll sideways
+
+### Story 3.6: Card Restructure — Onboarding Context, Checklists, Suggested Documentation, Approvals & Risks
+
+As a manager,
+I want the rest of the generated plan's content organized into clearly labeled cards in a sensible order, with nothing from the generated plan missing,
+So that I can review the whole plan without hunting for a section or wondering if something was left out.
+
+**Acceptance Criteria:**
+
+**Given** the detail view's main content column
+**When** it renders
+**Then** cards appear in this order: Progress, First tasks, Onboarding context, Repositories, Permissions, Checklists, Suggested documentation, Approvals and risks — with nothing rendering below Approvals and risks
+
+**Given** the First tasks card
+**When** it renders
+**Then** it lists `project.first_tasks` in full, with no fabricated fields (e.g. no due dates, since none exist on the data model)
+
+**Given** the Onboarding context card
+**When** it renders
+**Then** it shows three labeled sub-sections: Business goal (`project.business_goal`), Architecture summary (`project.architecture_summary`), and Details — Details shows `profile.summary` ("Role focus") and, only when present, `record.startDate`, `buddyEmail`, `seniority`, `location`, and `notes`, matching the conditional-display behavior of today's `OverviewCard`
+
+**Given** the Checklists card
+**When** it renders
+**Then** it shows two labeled sub-lists, Day 1 (`profile.base_checklist.day_1`) and Week 1 (`profile.base_checklist.week_1`), each in full
+
+**Given** the Suggested documentation card
+**When** it renders
+**Then** it lists `project.key_docs` in full
+
+**Given** the Approvals and risks card
+**When** it renders
+**Then** it shows two labeled sub-lists, Approvals required (`profile.approvals_required`) and Project risk notes (`project.risk_notes`), each in full
+
+**Given** this story ships
+**When** the page is compared to today's shipped version
+**Then** the old Day 1/Week 1 checklist pair, "Suggested first tasks"/"Suggested documentation" pair, and "Approvals and risks" card are superseded by the cards above — no duplicate rendering of the same content in two places
+
+**Given** the main content column is now longer (full content per card, no truncation)
+**When** the manager scrolls the page
+**Then** the Plan chat panel remains visible via its existing `position: sticky` behavior (`OnboardingDetailPage.tsx`'s aside is already `sticky top-16 h-[calc(100vh-4rem)]`) — this story only needs to verify this still holds against the new content length, no new sticky implementation is expected
+
+### Story 3.7: Viewed-Checkbox Review Pattern
+
+As a manager,
+I want to check off each card as I review it and have it collapse out of my way,
+So that I can track my own review progress on a plan the way I would review files in a pull request.
+
+**Acceptance Criteria:**
+
+**Given** any card except Progress (First tasks, Onboarding context, Repositories, Permissions, Checklists, Suggested documentation, Approvals and risks)
+**When** it renders
+**Then** it shows an unchecked "Viewed" checkbox in its header by default, and its full content is visible
+
+**Given** a card's "Viewed" checkbox
+**When** the manager checks it
+**Then** the card collapses to a single-line bar — its body content is hidden, its background shifts to a muted/surface-variant tone, and its title dims — driven by real component state (e.g. a `Set` of viewed card ids in `OnboardingDetailPage.tsx`), not a CSS-only mechanism
+
+**Given** a collapsed (Viewed) card
+**When** the manager unchecks its box
+**Then** it re-expands to its full content — the action is always reversible
+
+**Given** the app introduces its first semantic "success" color
+**When** the Viewed-checkbox's checked state and the Permissions table's "Included" column render their checkmarks
+**Then** both use one new token, `success` (`#16a34a`), rather than an untokenized literal color
+
+**Given** the manager reloads the page or navigates away and back
+**When** the detail view renders again
+**Then** all cards return to their default (unchecked, expanded) state — Viewed state is local UI state only, not persisted to `OnboardingRecord` or any backend field
+
+**Given** a collapsed (Viewed) card
+**When** inspected with assistive technology
+**Then** its hidden body content is genuinely removed from the accessibility tree (e.g. not rendered, or `hidden`/`aria-hidden`), not merely visually hidden while still exposed to screen readers
+
+**Given** any Viewed checkbox
+**When** navigated to via keyboard
+**Then** it shows a visible focus ring and can be toggled with `Space`, consistent with standard checkbox semantics
+
+### Story 3.8: Dark Mode Support
+
+As a manager,
+I want to switch the onboarding workspace to a dark theme,
+So that I can use the tool comfortably in low-light conditions or per my own preference.
+
+**Acceptance Criteria:**
+
+**Given** the app's existing light-mode token set (`frontend/src/index.css`)
+**When** this story ships
+**Then** a complete parallel dark-mode token set exists for every color role used on this page, including the new `success` token from Story 3.7 (`success-dark`, `#4ade80`) and the `review-container`/`on-review-container` pending-approval chip pair
+
+**Given** the header
+**When** it renders
+**Then** a sun/moon toggle appears between the Search and Notifications icons, using the Heroicons Sun/Moon icons from Story 3.4
+
+**Given** the manager clicks the theme toggle
+**When** the click is handled
+**Then** the whole page switches between light and dark token sets immediately, with no page reload
+
+**Given** the manager has not yet set a manual preference
+**When** the page loads
+**Then** it follows the OS/browser `prefers-color-scheme` setting
+
+**Given** the manager has clicked the toggle at least once
+**When** the page is reloaded or revisited
+**Then** the manually-chosen theme persists (client-side, e.g. `localStorage`) and overrides `prefers-color-scheme` until changed again
+
+**Given** every color pair in both the light and dark token sets
+**When** audited for contrast
+**Then** all pairs meet WCAG AA text contrast at the sizes they're used, except `success`/`success-dark`, which — being used only as a UI accent/glyph (checkbox, tick), never as text — is held to the 3:1 non-text contrast bar instead

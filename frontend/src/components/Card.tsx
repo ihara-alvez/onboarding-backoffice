@@ -13,7 +13,7 @@ const tints: Record<NonNullable<CardProps["tint"]>, string> = {
 export function Card({ tint = "surface", className = "", children, ...props }: CardProps) {
   return (
     <div
-      className={`rounded-md shadow-elevation-1 p-6 ${tints[tint]} ${className}`}
+      className={`rounded-lg border border-outline-variant p-6 shadow-elevation-1 ${tints[tint]} ${className}`}
       {...props}
     >
       {children}
