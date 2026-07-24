@@ -222,18 +222,74 @@ function PermissionsCard({ record }: { record: OnboardingRecord }) {
   );
 }
 
-function ChecklistCard({ title, items }: { title: string; items: string[] }) {
+function InfoItem({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
-      <SectionTitle>{title}</SectionTitle>
-      <ul className="mt-4 space-y-3">
-        {items.map((item) => (
-          <li key={item} className="flex gap-3 text-body-medium text-on-surface">
-            <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-outline" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
+    <div>
+      <dt className="text-label-large font-medium text-on-surface-variant">{label}</dt>
+      <dd className="mt-1 break-words text-body-medium text-on-surface">{value}</dd>
+    </div>
+  );
+}
+
+function OnboardingContextCard({ record }: { record: OnboardingRecord }) {
+  return (
+    <Card className="mb-5">
+      <SectionTitle>Onboarding context</SectionTitle>
+      <div className="mt-5 grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 className="text-label-large font-medium text-on-surface-variant">Business goal</h3>
+          <p className="mt-1 break-words text-body-medium text-on-surface">{record.project.business_goal}</p>
+        </div>
+        <div>
+          <h3 className="text-label-large font-medium text-on-surface-variant">Architecture summary</h3>
+          <p className="mt-1 break-words text-body-medium text-on-surface">{record.project.architecture_summary}</p>
+        </div>
+      </div>
+      <div className="mt-6 border-t border-outline-variant pt-5">
+        <h3 className="text-label-large font-medium text-on-surface-variant">Details</h3>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          <InfoItem label="Role focus" value={record.profile.summary} />
+          {record.startDate && <InfoItem label="Start date" value={formatDate(record.startDate)} />}
+          {record.buddyEmail && <InfoItem label="Buddy" value={record.buddyEmail} />}
+          {record.seniority && <InfoItem label="Seniority" value={record.seniority} />}
+          {record.location && <InfoItem label="Location" value={record.location} />}
+          {record.notes && <InfoItem label="Notes" value={record.notes} />}
+        </dl>
+      </div>
+    </Card>
+  );
+}
+
+function ChecklistList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="text-body-medium text-on-surface-variant">None.</p>;
+  }
+  return (
+    <ul className="space-y-3">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`} className="flex gap-3 text-body-medium text-on-surface">
+          <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-outline" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ChecklistsCard({ record }: { record: OnboardingRecord }) {
+  return (
+    <Card className="mb-5">
+      <SectionTitle>Checklists</SectionTitle>
+      <div className="mt-5 grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 className="mb-3 text-label-large font-medium text-on-surface-variant">Day 1</h3>
+          <ChecklistList items={record.profile.base_checklist.day_1} />
+        </div>
+        <div>
+          <h3 className="mb-3 text-label-large font-medium text-on-surface-variant">Week 1</h3>
+          <ChecklistList items={record.profile.base_checklist.week_1} />
+        </div>
+      </div>
     </Card>
   );
 }
@@ -549,17 +605,17 @@ export function OnboardingDetailPage() {
           {record.notification && <div className="mb-5 rounded-md border border-primary/20 bg-primary-container px-4 py-3 text-body-medium text-on-primary-container">Sent to <strong>{record.notification.sentTo}</strong> at {new Date(record.notification.sentAt).toLocaleTimeString()}.</div>}
 
           <ProgressCard record={record} />
+          <Card className="mb-5">
+            <SectionTitle>First tasks</SectionTitle>
+            <div className="mt-4"><BulletList items={record.project.first_tasks} /></div>
+          </Card>
+          <OnboardingContextCard record={record} />
           <RepositoriesCard record={record} />
           <PermissionsCard record={record} />
-          <div className="mb-5 grid gap-5 md:grid-cols-2">
-            <ChecklistCard title="Day 1 checklist" items={record.profile.base_checklist.day_1} />
-            <ChecklistCard title="Week 1 checklist" items={record.profile.base_checklist.week_1} />
-          </div>
+          <ChecklistsCard record={record} />
           <Card className="mb-5">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div><SectionTitle>Suggested first tasks</SectionTitle><div className="mt-4"><BulletList items={record.project.first_tasks} /></div></div>
-              <div><SectionTitle>Suggested documentation</SectionTitle><div className="mt-4"><BulletList items={record.project.key_docs} /></div></div>
-            </div>
+            <SectionTitle>Suggested documentation</SectionTitle>
+            <div className="mt-4"><BulletList items={record.project.key_docs} /></div>
           </Card>
           <Card className="mb-5 border-amber-200 bg-amber-50">
             <SectionTitle>Approvals and risks</SectionTitle>

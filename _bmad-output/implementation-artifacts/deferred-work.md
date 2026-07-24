@@ -75,3 +75,7 @@
 ## Deferred from: code review of 3-5-repositories-permissions-as-data-tables (2026-07-24)
 
 - Duplicate repository names can produce duplicate React keys in `frontend/src/pages/OnboardingDetailPage.tsx:151`; deferred because this keying behavior predates the story and `ProjectRepo` has no stable ID field.
+
+## Deferred from: code review of 3-6-card-restructure-onboarding-context-checklists-suggested-documentation-approvals-risks (2026-07-24)
+
+- Malformed optional start dates render as `Invalid Date` in `frontend/src/pages/OnboardingDetailPage.tsx:252`; deferred because new records are backend-validated and the existing `formatDate` helper behavior predates this story.
