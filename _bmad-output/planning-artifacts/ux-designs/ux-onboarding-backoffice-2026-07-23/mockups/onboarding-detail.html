@@ -600,6 +600,44 @@
         flex-shrink: 0;
       }
 
+      @media (max-width: 900px) {
+        .workspace {
+          display: block;
+        }
+
+        aside.chat {
+          width: auto;
+          position: static;
+          height: 600px;
+          max-height: none;
+          margin-top: 16px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .page {
+          padding: 16px 12px 32px;
+        }
+
+        .page-head,
+        .chat-input-row {
+          align-items: stretch;
+        }
+
+        .page-actions,
+        .chat-input-row {
+          width: 100%;
+        }
+
+        .page-actions .btn {
+          flex: 1 1 auto;
+        }
+
+        .chat-input {
+          min-width: 0;
+        }
+      }
+
       .caption {
         max-width: 1500px;
         margin: 0 auto 8px;
@@ -1112,27 +1150,22 @@
                   <tr>
                     <th>Permission</th>
                     <th>System</th>
-                    <th>Included</th>
                   </tr>
                   <tr>
                     <td>s3:read</td>
                     <td><span class="badge">AWS</span></td>
-                    <td><span class="tick">✓</span></td>
                   </tr>
                   <tr>
                     <td>ec2:describe</td>
                     <td><span class="badge">AWS</span></td>
-                    <td><span class="tick">✓</span></td>
                   </tr>
                   <tr>
                     <td>read</td>
                     <td><span class="badge">Repositories</span></td>
-                    <td><span class="tick">✓</span></td>
                   </tr>
                   <tr>
                     <td>pipeline:trigger</td>
                     <td><span class="badge">CI/CD</span></td>
-                    <td><span class="tick">✓</span></td>
                   </tr>
                 </table>
               </div>

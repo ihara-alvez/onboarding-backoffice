@@ -142,8 +142,8 @@ Plan generation moves off the local Python subprocess onto the deployed AgentCor
 
 ### Epic 3: Onboarding Detail Page Redesign
 
-Redesigns the onboarding detail/workspace page per the project's first UX design contract (`ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md` + `EXPERIENCE.md`): an always-visible, status-aware header action bar; a progress-stepper alignment fix; a nine-card content structure with a GitHub-PR-style "Viewed" collapse pattern replacing the old Narrative/Activity/Full-plan cards; a Heroicons icon-library adoption; and full dark-mode support.
-**UX-DRs covered:** UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR5, UX-DR6, UX-DR7, UX-DR8, UX-DR9, UX-DR10
+Redesigns the onboarding detail/workspace page per the project's first UX design contract (`ux-designs/ux-onboarding-backoffice-2026-07-23/DESIGN.md` + `EXPERIENCE.md`): an always-visible, status-aware header action bar; a progress-stepper alignment fix; a nine-card content structure with a GitHub-PR-style "Viewed" collapse pattern replacing the old Narrative/Activity/Full-plan cards; a Heroicons icon-library adoption; full dark-mode support; and follow-up People/list and chat usability enhancements.
+**UX-DRs covered:** UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR5, UX-DR6, UX-DR7, UX-DR8, UX-DR9, UX-DR10, plus Stories 3.9–3.14 follow-up UX requirements
 **FRs/NFRs covered:** none (no PRD change — this epic is UX-spine-driven)
 
 ---
@@ -773,3 +773,139 @@ So that I can use the tool comfortably in low-light conditions or per my own pre
 **Given** every color pair in both the light and dark token sets
 **When** audited for contrast
 **Then** all pairs meet WCAG AA text contrast at the sizes they're used, except `success`/`success-dark`, which — being used only as a UI accent/glyph (checkbox, tick), never as text — is held to the 3:1 non-text contrast bar instead
+
+### Story 3.9: Chat Send Affordance and Keyboard Submission
+
+As a manager,
+I want a recognizable send control and a keyboard shortcut for submitting chat messages,
+So that sending a revision request is obvious and fast.
+
+**Acceptance Criteria:**
+
+**Given** an editable chat
+**When** the input renders
+**Then** the adjacent button contains a visible send icon matching the onboarding detail reference, has an accessible name such as "Send message", and is visibly disabled when sending is unavailable
+
+**Given** the input contains non-empty text
+**When** the manager presses Enter without Shift
+**Then** the message is submitted through the same handler as clicking Send
+
+**Given** the manager presses Shift+Enter
+**When** the input has focus
+**Then** a newline is inserted and the message is not submitted
+
+**Given** the input is empty, read-only, or a response is streaming
+**When** the manager presses Enter or activates Send
+**Then** no message is submitted
+
+### Story 3.10: Chat Response Intent and Outcome Handling
+
+As a manager,
+I want responses to unrelated prompts to explain that they are out of scope,
+So that the UI does not claim that an onboarding plan changed when it did not.
+
+**Acceptance Criteria:**
+
+**Given** a prompt unrelated to the onboarding process or plan
+**When** the agent responds
+**Then** the transcript shows a clear out-of-scope or informational response and does not show "Plan updated"
+
+**Given** a prompt produces a valid onboarding-plan revision
+**When** the revision is applied
+**Then** the success response may show "Plan updated" and the revised plan is displayed
+
+**Given** a prompt cannot be classified or the agent reports an error
+**When** the response completes
+**Then** the chat shows an error or clarification state, preserves the previous plan, and does not claim success
+
+**Given** the response is classified
+**When** the frontend renders the result
+**Then** it uses an explicit response/result contract rather than client-side keyword guessing
+
+### Story 3.11: Refresh People Data After Chat Plan Changes
+
+As a manager,
+I want the People/list view to reflect a chat-driven Markdown plan update,
+So that the list and detail data do not remain stale after a manager revision.
+
+**Acceptance Criteria:**
+
+**Given** a chat request changes the stored onboarding `.md` plan
+**When** the revision completes successfully
+**Then** the current detail state and People/list data are refreshed from the persisted record
+
+**Given** the revision is unrelated, rejected, or fails
+**When** the response completes
+**Then** no refresh is presented as a successful plan update and the prior persisted plan remains intact
+
+**Given** the People/list data is refreshed
+**When** the updated record is applied
+**Then** onboarding identity, profile/project snapshot, and unrelated local UI state are preserved
+
+**Given** the user is on another route when the change occurs
+**When** the People/list view is opened later
+**Then** it reads the current persisted record through the existing API
+
+### Story 3.12: Responsive People and Onboarding Detail Layout
+
+As a manager,
+I want the People list and onboarding detail page to remain usable at narrow and wide viewport sizes,
+So that the workspace does not clip, overlap, or force unexpected page-level scrolling.
+
+**Acceptance Criteria:**
+
+**Given** a desktop-width viewport
+**When** the detail page renders
+**Then** the main content and sticky chat remain in the two-pane layout represented by the reference mockup
+
+**Given** a tablet or mobile-width viewport
+**When** the detail page renders
+**Then** it collapses into a single readable column, with chat in page flow and no clipped fixed-width aside
+
+**Given** any supported viewport width
+**When** header actions, status chips, tables, chat input, and send button render
+**Then** they wrap or resize without horizontal page overflow; tables may scroll within their own container
+
+**Given** the People list renders at a narrow width
+**When** the manager scans or operates it
+**Then** employee identity, status, and primary actions remain readable and usable
+
+### Story 3.13: Simplify Permissions Table
+
+As a manager,
+I want the Permissions table to show only useful permission information,
+So that the table is easier to scan.
+
+**Acceptance Criteria:**
+
+**Given** the Requested or Approved permissions table renders
+**When** its columns are displayed
+**Then** it shows exactly `Permission` and `System`
+
+**Given** the simplified table renders
+**When** it is inspected visually or with assistive technology
+**Then** no `Included` header, checkmark, or screen-reader-only Included label remains
+
+**Given** the permissions card renders
+**When** the onboarding status changes
+**Then** Requested-versus-Approved title behavior remains unchanged and table overflow remains contained within the card
+
+### Story 3.14: Human-Readable Onboarding List Statuses
+
+As a manager,
+I want lifecycle statuses in the main People/onboarding list to use readable labels,
+So that I can scan onboarding progress without interpreting storage values.
+
+**Acceptance Criteria:**
+
+**Given** an onboarding is shown in the main list
+**When** its status is rendered
+**Then** it displays `Draft`, `Pending approval`, `Ready for day 1`, `In progress`, `Blocked`, or `Completed`
+
+**Given** a status label is displayed in the list or detail chip
+**When** the UI formats it
+**Then** it uses a centralized display-label helper and never exposes the raw API/storage value as user-facing copy
+
+**Given** human-readable labels are introduced
+**When** status tone, sorting, filtering, or lifecycle transitions operate
+**Then** their existing behavior remains unchanged

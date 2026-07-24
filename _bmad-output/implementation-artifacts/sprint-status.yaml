@@ -77,4 +77,10 @@ development_status:
   3-6-card-restructure-onboarding-context-checklists-suggested-documentation-approvals-risks: done
   3-7-viewed-checkbox-review-pattern: done
   3-8-dark-mode-support: done
+  3-9-chat-send-affordance-and-keyboard-submission: ready-for-dev
+  3-10-chat-response-intent-and-outcome-handling: ready-for-dev
+  3-11-refresh-people-data-after-chat-plan-changes: ready-for-dev
+  3-12-responsive-people-and-onboarding-detail-layout: ready-for-dev
+  3-13-simplify-permissions-table: ready-for-dev
+  3-14-human-readable-onboarding-list-statuses: ready-for-dev
   epic-3-retrospective: optional
