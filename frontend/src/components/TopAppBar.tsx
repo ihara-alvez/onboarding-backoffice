@@ -1,4 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
+import {
+  BellIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/outline";
 
 function BrandMark() {
   return (
@@ -11,45 +15,13 @@ function BrandMark() {
   );
 }
 
-function SearchIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" />
-    </svg>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z" />
-      <path d="M10 21h4" />
-    </svg>
-  );
-}
-
 export function TopAppBar() {
   const location = useLocation();
   const peopleActive =
     location.pathname === "/" || location.pathname.startsWith("/onboardings");
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-outline-variant bg-surface-container px-8 shadow-elevation-1">
+    <header className="sticky top-0 z-10 flex h-auto min-h-16 flex-wrap items-center justify-between gap-y-2 border-b border-outline-variant bg-surface-container px-8 py-3 shadow-elevation-1">
       <div className="flex h-full items-center gap-10">
         <Link
           to="/"
@@ -88,20 +60,20 @@ export function TopAppBar() {
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex max-w-full flex-wrap items-center justify-end gap-4">
         <button
           type="button"
           aria-label="Search"
-          className="text-on-surface-variant hover:text-on-surface"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          <SearchIcon />
+          <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
         </button>
         <button
           type="button"
           aria-label="Notifications"
-          className="relative text-on-surface-variant hover:text-on-surface"
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          <BellIcon />
+          <BellIcon className="h-5 w-5" aria-hidden="true" />
           <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
         </button>
         <span

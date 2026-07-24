@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { TrashIcon } from "@heroicons/react/24/outline";
 import { deleteOnboarding, listOnboardings } from "../api/client";
 import type { OnboardingRecord } from "../api/types";
 import { Card } from "../components/Card";
@@ -8,7 +9,6 @@ import { Chip } from "../components/Chip";
 import { IconButton } from "../components/IconButton";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
-import { TrashIcon } from "../components/TrashIcon";
 import { statusTone } from "../statusDisplay";
 
 export function OnboardingListPage() {

@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowDownTrayIcon,
+  ClockIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import {
   approveOnboarding,
   deleteOnboarding,
   getOnboarding,
@@ -17,7 +22,6 @@ import { ChatPanel } from "../components/ChatPanel";
 import { Chip } from "../components/Chip";
 import { IconButton } from "../components/IconButton";
 import { Spinner } from "../components/Spinner";
-import { TrashIcon } from "../components/TrashIcon";
 import { isApprovedStatus, statusTone } from "../statusDisplay";
 
 const progressStages: Array<{ status: OnboardingStatus; label: string }> = [
@@ -463,15 +467,17 @@ export function OnboardingDetailPage() {
                   ref={historyTriggerRef}
                   type="button"
                   onClick={() => setHistoryOpen(true)}
-                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
+                  className="-mx-1 inline-flex items-center gap-1 rounded-md px-1 font-medium text-primary hover:bg-primary-container/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
+                  <ClockIcon className="h-4 w-4" aria-hidden="true" />
                   View history
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadPlan}
-                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
+                  className="-mx-1 inline-flex items-center gap-1 rounded-md px-1 font-medium text-primary hover:bg-primary-container/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
+                  <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
                   Download plan (.md)
                 </button>
               </div>
