@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowDownTrayIcon,
+  ClockIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import {
   approveOnboarding,
   deleteOnboarding,
   getOnboarding,
@@ -17,7 +22,6 @@ import { ChatPanel } from "../components/ChatPanel";
 import { Chip } from "../components/Chip";
 import { IconButton } from "../components/IconButton";
 import { Spinner } from "../components/Spinner";
-import { TrashIcon } from "../components/TrashIcon";
 import { isApprovedStatus, statusTone } from "../statusDisplay";
 
 const progressStages: Array<{ status: OnboardingStatus; label: string }> = [
@@ -28,12 +32,13 @@ const progressStages: Array<{ status: OnboardingStatus; label: string }> = [
   { status: "completed", label: "Completed" },
 ];
 
-function BulletList({ items }: { items: string[] }) {
+function BulletList({ items, tone = "surface" }: { items: string[]; tone?: "surface" | "review" }) {
+  const textClass = tone === "review" ? "text-on-review-container" : "text-on-surface";
   if (items.length === 0) {
-    return <p className="text-body-medium text-on-surface-variant">None.</p>;
+    return <p className={`text-body-medium ${textClass}`}>None.</p>;
   }
   return (
-    <ul className="space-y-2 text-body-medium text-on-surface">
+    <ul className={`space-y-2 text-body-medium ${textClass}`}>
       {items.map((item, i) => (
         <li key={i} className="flex gap-2">
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
@@ -46,6 +51,38 @@ function BulletList({ items }: { items: string[] }) {
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="text-title-medium font-semibold text-on-surface">{children}</h2>;
+}
+
+interface ReviewableCardProps {
+  cardId: string;
+  title: string;
+  viewed: boolean;
+  onViewedChange: (viewed: boolean) => void;
+  children: ReactNode;
+  className?: string;
+}
+
+function ReviewableCard({ cardId, title, viewed, onViewedChange, children, className = "" }: ReviewableCardProps) {
+  const checkboxId = `viewed-${cardId}`;
+  return (
+    <Card className={`mb-5 transition-colors ${className} ${viewed ? "bg-surface-variant !p-3.5 !px-5 shadow-none" : ""}`}>
+      <div className="flex min-w-0 items-center justify-between gap-4">
+        <h2 className={`min-w-0 break-words text-title-medium font-semibold ${viewed ? "text-on-surface-variant" : "text-on-surface"}`}>{title}</h2>
+        <label htmlFor={checkboxId} className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-label-large text-on-surface-variant">
+          <input
+            id={checkboxId}
+            type="checkbox"
+            checked={viewed}
+            onChange={(event) => onViewedChange(event.target.checked)}
+            aria-label={`Viewed: ${title}`}
+            className="h-4 w-4 rounded accent-success focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          />
+          Viewed
+        </label>
+      </div>
+      {!viewed && <div className="mt-5">{children}</div>}
+    </Card>
+  );
 }
 
 function formatDate(value: string): string {
@@ -123,79 +160,172 @@ function ProgressCard({ record }: { record: OnboardingRecord }) {
   );
 }
 
-function RepositoriesCard({ record }: { record: OnboardingRecord }) {
+interface ReviewStateProps {
+  viewed: boolean;
+  onViewedChange: (viewed: boolean) => void;
+}
+
+function RepositoriesCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   return (
-    <Card className="mb-5">
+    <ReviewableCard cardId="repositories" title="Repositories" viewed={viewed} onViewedChange={onViewedChange}>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <SectionTitle>Repositories</SectionTitle>
-          <p className="mt-1 text-body-medium text-on-surface-variant">Codebases and setup commands for the first week.</p>
-        </div>
+        <p className="text-body-medium text-on-surface-variant">Codebases and setup commands for the first week.</p>
         <span className="text-label-large text-on-surface-variant">{record.project.repositories.length} connected</span>
       </div>
-      <div className="overflow-hidden rounded-md border border-outline-variant">
-        <div className="hidden grid-cols-[1.4fr_0.7fr_1fr] gap-4 bg-surface-variant px-4 py-3 text-label-large font-medium text-on-surface-variant sm:grid">
-          <span>Repository</span><span>Access</span><span>Setup</span>
-        </div>
-        {record.project.repositories.map((repo) => (
-          <div key={repo.name} className="grid gap-2 border-t border-outline-variant px-4 py-4 first:border-t-0 sm:grid-cols-[1.4fr_0.7fr_1fr] sm:items-center sm:gap-4">
-            <div>
-              <p className="text-body-medium font-semibold text-on-surface">{repo.name}</p>
-              <p className="mt-1 text-label-large text-on-surface-variant">{repo.description}</p>
-            </div>
-            <Chip tone="secondary">{record.profile.permissions.repositories.access}</Chip>
-            <code className="overflow-x-auto rounded-md bg-surface-variant px-3 py-2 text-label-large text-on-surface-variant">{repo.bootstrap} · {repo.test}</code>
-          </div>
-        ))}
+      <div role="region" aria-label="Repositories table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
+        <table className="min-w-[640px] w-full border-collapse text-left">
+          <caption className="sr-only">Repositories and setup commands</caption>
+          <thead className="bg-surface-variant text-label-large font-medium text-on-surface-variant">
+            <tr>
+              <th scope="col" className="px-4 py-3">Repository</th>
+              <th scope="col" className="px-4 py-3">Access</th>
+              <th scope="col" className="px-4 py-3">Setup</th>
+            </tr>
+          </thead>
+          <tbody className="text-body-medium text-on-surface">
+            {record.project.repositories.length > 0 ? record.project.repositories.map((repo) => (
+              <tr key={repo.name} className="border-t border-outline-variant align-top">
+                <td className="px-4 py-4">
+                  <p className="font-semibold">{repo.name}</p>
+                  <p className="mt-1 text-label-large text-on-surface-variant">{repo.description}</p>
+                </td>
+                <td className="whitespace-nowrap px-4 py-4">{record.profile.permissions.repositories.access}</td>
+                <td className="px-4 py-4">
+                  <code className="block whitespace-normal rounded-md bg-surface-variant px-3 py-2 text-label-large text-on-surface-variant">
+                    {repo.bootstrap} · {repo.test}
+                  </code>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={3} className="px-4 py-4 text-on-surface-variant">No repositories connected.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
-function PermissionsCard({ record }: { record: OnboardingRecord }) {
+function PermissionsCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   const { permissions } = record.profile;
+  const permissionRows = [
+    ...permissions.aws.map((permission, index) => ({ permission, system: "AWS", key: `aws-${permission}-${index}` })),
+    { permission: permissions.repositories.access, system: "Repositories", key: `repositories-${permissions.repositories.access}` },
+    ...permissions.ci_cd.map((permission, index) => ({ permission, system: "CI/CD", key: `ci-cd-${permission}-${index}` })),
+  ];
+
   return (
-    <Card className="mb-5">
+    <ReviewableCard
+      cardId="permissions"
+      title={isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}
+      viewed={viewed}
+      onViewedChange={onViewedChange}
+    >
       <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
-          <p className="mt-1 text-body-medium text-on-surface-variant">Access needed to contribute safely from day one.</p>
-        </div>
+        <p className="text-body-medium text-on-surface-variant">Access needed to contribute safely from day one.</p>
         <Chip tone={isApprovedStatus(record.status) ? "primary" : "secondary"}>{isApprovedStatus(record.status) ? "Approved" : "Pending"}</Chip>
       </div>
-      <div className="grid gap-5 md:grid-cols-3">
-        <PermissionGroup label="AWS" items={permissions.aws} />
-        <PermissionGroup label="Repositories" items={[permissions.repositories.access]} />
-        <PermissionGroup label="CI/CD" items={permissions.ci_cd} />
+      <div role="region" aria-label="Permissions table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
+        <table className="min-w-[560px] w-full border-collapse text-left">
+          <caption className="sr-only">Requested or approved permissions by system</caption>
+          <thead className="bg-surface-variant text-label-large font-medium text-on-surface-variant">
+            <tr>
+              <th scope="col" className="px-4 py-3">Permission</th>
+              <th scope="col" className="px-4 py-3">System</th>
+              <th scope="col" className="px-4 py-3">Included</th>
+            </tr>
+          </thead>
+          <tbody className="text-body-medium text-on-surface">
+            {permissionRows.length > 0 ? permissionRows.map((row) => (
+              <tr key={row.key} className="border-t border-outline-variant">
+                <td className="break-words px-4 py-3">{row.permission}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{row.system}</td>
+                <td className="px-4 py-3">
+                  <span className="sr-only">Included</span>
+                  <span aria-hidden="true" className="font-semibold text-success">✓</span>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-on-surface-variant">No permissions listed.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
-function PermissionGroup({ label, items }: { label: string; items: string[] }) {
+function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-2 text-label-large font-medium text-on-surface-variant">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => <span key={item} className="rounded-md border border-outline-variant bg-surface-variant px-2.5 py-1 text-label-large text-on-surface">{item}</span>)}
-      </div>
+      <dt className="text-label-large font-medium text-on-surface-variant">{label}</dt>
+      <dd className="mt-1 break-words text-body-medium text-on-surface">{value}</dd>
     </div>
   );
 }
 
-function ChecklistCard({ title, items }: { title: string; items: string[] }) {
+function OnboardingContextCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   return (
-    <Card>
-      <SectionTitle>{title}</SectionTitle>
-      <ul className="mt-4 space-y-3">
-        {items.map((item) => (
-          <li key={item} className="flex gap-3 text-body-medium text-on-surface">
-            <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-outline" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <ReviewableCard cardId="onboarding-context" title="Onboarding context" viewed={viewed} onViewedChange={onViewedChange}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 className="text-label-large font-medium text-on-surface-variant">Business goal</h3>
+          <p className="mt-1 break-words text-body-medium text-on-surface">{record.project.business_goal}</p>
+        </div>
+        <div>
+          <h3 className="text-label-large font-medium text-on-surface-variant">Architecture summary</h3>
+          <p className="mt-1 break-words text-body-medium text-on-surface">{record.project.architecture_summary}</p>
+        </div>
+      </div>
+      <div className="mt-6 border-t border-outline-variant pt-5">
+        <h3 className="text-label-large font-medium text-on-surface-variant">Details</h3>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+          <InfoItem label="Role focus" value={record.profile.summary} />
+          {record.startDate && <InfoItem label="Start date" value={formatDate(record.startDate)} />}
+          {record.buddyEmail && <InfoItem label="Buddy" value={record.buddyEmail} />}
+          {record.seniority && <InfoItem label="Seniority" value={record.seniority} />}
+          {record.location && <InfoItem label="Location" value={record.location} />}
+          {record.notes && <InfoItem label="Notes" value={record.notes} />}
+        </dl>
+      </div>
+    </ReviewableCard>
+  );
+}
+
+function ChecklistList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="text-body-medium text-on-surface-variant">None.</p>;
+  }
+  return (
+    <ul className="space-y-3">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`} className="flex gap-3 text-body-medium text-on-surface">
+          <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-outline" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ChecklistsCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
+  return (
+    <ReviewableCard cardId="checklists" title="Checklists" viewed={viewed} onViewedChange={onViewedChange}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 className="mb-3 text-label-large font-medium text-on-surface-variant">Day 1</h3>
+          <ChecklistList items={record.profile.base_checklist.day_1} />
+        </div>
+        <div>
+          <h3 className="mb-3 text-label-large font-medium text-on-surface-variant">Week 1</h3>
+          <ChecklistList items={record.profile.base_checklist.week_1} />
+        </div>
+      </div>
+    </ReviewableCard>
   );
 }
 
@@ -285,6 +415,7 @@ export function OnboardingDetailPage() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewedCards, setViewedCards] = useState<Set<string>>(() => new Set());
   const currentIdRef = useRef(id);
   const historyTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -295,9 +426,23 @@ export function OnboardingDetailPage() {
     setChatError(null);
     setSendingChat(false);
     setLastSentMessage(null);
+    setRecord(null);
+    setViewedCards(new Set());
     if (!id) return;
     getOnboarding(id).then(setRecord).catch((err) => setError(err.message));
   }, [id]);
+
+  function handleViewedChange(cardId: string, viewed: boolean): void {
+    setViewedCards((current) => {
+      const next = new Set(current);
+      if (viewed) {
+        next.add(cardId);
+      } else {
+        next.delete(cardId);
+      }
+      return next;
+    });
+  }
 
   async function handleApprove() {
     if (!id) return;
@@ -339,7 +484,9 @@ export function OnboardingDetailPage() {
     if (!id) return;
     setRetrying(true);
     try {
-      setRecord(await retryGeneration(id, () => undefined));
+      const updated = await retryGeneration(id, () => undefined);
+      setViewedCards(new Set());
+      setRecord(updated);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -392,6 +539,7 @@ export function OnboardingDetailPage() {
         if (currentIdRef.current === chatId) setChatEvents((prev) => [...prev, event]);
       });
       if (currentIdRef.current !== chatId) return;
+      setViewedCards(new Set());
       setRecord(updated);
       setChatMessage("");
     } catch (err) {
@@ -399,7 +547,10 @@ export function OnboardingDetailPage() {
       setChatError((err as Error).message);
       try {
         const refreshed = await getOnboarding(chatId);
-        if (currentIdRef.current === chatId) setRecord(refreshed);
+        if (currentIdRef.current === chatId) {
+          setViewedCards(new Set());
+          setRecord(refreshed);
+        }
       } catch {
         // The original chat error remains visible when the best-effort refresh fails.
       }
@@ -463,15 +614,17 @@ export function OnboardingDetailPage() {
                   ref={historyTriggerRef}
                   type="button"
                   onClick={() => setHistoryOpen(true)}
-                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
+                  className="-mx-1 inline-flex items-center gap-1 rounded-md px-1 font-medium text-primary hover:bg-primary-container/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
+                  <ClockIcon className="h-4 w-4" aria-hidden="true" />
                   View history
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadPlan}
-                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
+                  className="-mx-1 inline-flex items-center gap-1 rounded-md px-1 font-medium text-primary hover:bg-primary-container/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
+                  <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />
                   Download plan (.md)
                 </button>
               </div>
@@ -508,25 +661,54 @@ export function OnboardingDetailPage() {
           {record.notification && <div className="mb-5 rounded-md border border-primary/20 bg-primary-container px-4 py-3 text-body-medium text-on-primary-container">Sent to <strong>{record.notification.sentTo}</strong> at {new Date(record.notification.sentAt).toLocaleTimeString()}.</div>}
 
           <ProgressCard record={record} />
-          <RepositoriesCard record={record} />
-          <PermissionsCard record={record} />
-          <div className="mb-5 grid gap-5 md:grid-cols-2">
-            <ChecklistCard title="Day 1 checklist" items={record.profile.base_checklist.day_1} />
-            <ChecklistCard title="Week 1 checklist" items={record.profile.base_checklist.week_1} />
-          </div>
-          <Card className="mb-5">
+          <ReviewableCard
+            cardId="first-tasks"
+            title="First tasks"
+            viewed={viewedCards.has("first-tasks")}
+            onViewedChange={(viewed) => handleViewedChange("first-tasks", viewed)}
+          >
+            <div><BulletList items={record.project.first_tasks} /></div>
+          </ReviewableCard>
+          <OnboardingContextCard
+            record={record}
+            viewed={viewedCards.has("onboarding-context")}
+            onViewedChange={(viewed) => handleViewedChange("onboarding-context", viewed)}
+          />
+          <RepositoriesCard
+            record={record}
+            viewed={viewedCards.has("repositories")}
+            onViewedChange={(viewed) => handleViewedChange("repositories", viewed)}
+          />
+          <PermissionsCard
+            record={record}
+            viewed={viewedCards.has("permissions")}
+            onViewedChange={(viewed) => handleViewedChange("permissions", viewed)}
+          />
+          <ChecklistsCard
+            record={record}
+            viewed={viewedCards.has("checklists")}
+            onViewedChange={(viewed) => handleViewedChange("checklists", viewed)}
+          />
+          <ReviewableCard
+            cardId="suggested-documentation"
+            title="Suggested documentation"
+            viewed={viewedCards.has("suggested-documentation")}
+            onViewedChange={(viewed) => handleViewedChange("suggested-documentation", viewed)}
+          >
+            <div><BulletList items={record.project.key_docs} /></div>
+          </ReviewableCard>
+          <ReviewableCard
+            cardId="approvals-risks"
+            title="Approvals and risks"
+            viewed={viewedCards.has("approvals-risks")}
+            onViewedChange={(viewed) => handleViewedChange("approvals-risks", viewed)}
+            className="border-review-container bg-review-container"
+          >
             <div className="grid gap-6 md:grid-cols-2">
-              <div><SectionTitle>Suggested first tasks</SectionTitle><div className="mt-4"><BulletList items={record.project.first_tasks} /></div></div>
-              <div><SectionTitle>Suggested documentation</SectionTitle><div className="mt-4"><BulletList items={record.project.key_docs} /></div></div>
+              <div><p className="mb-2 text-label-large font-medium text-on-review-container">Approvals required</p><BulletList tone="review" items={record.profile.approvals_required} /></div>
+              <div><p className="mb-2 text-label-large font-medium text-on-review-container">Project risk notes</p><BulletList tone="review" items={record.project.risk_notes} /></div>
             </div>
-          </Card>
-          <Card className="mb-5 border-amber-200 bg-amber-50">
-            <SectionTitle>Approvals and risks</SectionTitle>
-            <div className="mt-4 grid gap-6 md:grid-cols-2">
-              <div><p className="mb-2 text-label-large font-medium text-amber-900">Approvals required</p><BulletList items={record.profile.approvals_required} /></div>
-              <div><p className="mb-2 text-label-large font-medium text-amber-900">Project risk notes</p><BulletList items={record.project.risk_notes} /></div>
-            </div>
-          </Card>
+          </ReviewableCard>
         </main>
         <aside className="sticky top-16 h-[calc(100vh-4rem)] w-[440px] shrink-0 overflow-hidden">
           <ChatPanel

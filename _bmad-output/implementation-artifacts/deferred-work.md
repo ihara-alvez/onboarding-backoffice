@@ -71,3 +71,11 @@
 
 - Backend never locks `/approve` or `/send-for-approval` against a concurrent `/chat` request — pre-existing gap in Story 2.3's already-merged code (`backend/src/routes/onboardings.ts`). Frontend's new mutual-exclusion closes the practical UI path to it, but a direct API call could still race the server-side state. Cross-track backend concurrency work, not blocking the Track B UI PR.
 - Zero regression coverage for the SSE error-shape bug this review found and fixed — this project's test convention (`node:test` via `tsx --test`) doesn't yet cover HTTP routes at all, only pure functions. Adding route-level test coverage is a separate testing-infrastructure investment.
+
+## Deferred from: code review of 3-5-repositories-permissions-as-data-tables (2026-07-24)
+
+- Duplicate repository names can produce duplicate React keys in `frontend/src/pages/OnboardingDetailPage.tsx:151`; deferred because this keying behavior predates the story and `ProjectRepo` has no stable ID field.
+
+## Deferred from: code review of 3-6-card-restructure-onboarding-context-checklists-suggested-documentation-approvals-risks (2026-07-24)
+
+- Malformed optional start dates render as `Invalid Date` in `frontend/src/pages/OnboardingDetailPage.tsx:252`; deferred because new records are backend-validated and the existing `formatDate` helper behavior predates this story.

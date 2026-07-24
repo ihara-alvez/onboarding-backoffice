@@ -23,9 +23,12 @@
   --color-on-error: #ffffff;
   --color-error-container: #fee4e2;
   --color-on-error-container: #912018;
+  --color-review-container: #fef3c7;
+  --color-on-review-container: #92400e;
 
   --color-outline: #98a2b3;
   --color-outline-variant: #e4e7ec;
+  --color-success: #16a34a;
 
   /* MD3 shape scale */
   --radius-xs: 4px;
@@ -52,6 +55,60 @@
   --shadow-elevation-1: 0px 1px 2px 0px rgba(16, 24, 40, 0.05), 0px 1px 3px 1px rgba(16, 24, 40, 0.04);
   --shadow-elevation-2: 0px 2px 4px 0px rgba(16, 24, 40, 0.06), 0px 4px 12px 0px rgba(16, 24, 40, 0.05);
   --shadow-elevation-3: 0px 4px 8px 0px rgba(16, 24, 40, 0.08), 0px 8px 20px 0px rgba(16, 24, 40, 0.06);
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-primary: #9db8f5;
+  --color-on-primary: #0a2757;
+  --color-primary-container: #1d3f8f;
+  --color-on-primary-container: #dce6ff;
+
+  --color-secondary: #b0b8c4;
+  --color-on-secondary: #1f242c;
+  --color-secondary-container: #3a4149;
+  --color-on-secondary-container: #e3e7ed;
+
+  --color-surface: #0f141b;
+  --color-surface-container: #1a2029;
+  --color-on-surface: #e6e9ee;
+  --color-surface-variant: #242b35;
+  --color-on-surface-variant: #a6adb8;
+
+  --color-error: #ff8a80;
+  --color-on-error: #4e0b04;
+  --color-error-container: #6b1710;
+  --color-on-error-container: #ffd9d4;
+
+  --color-review-container: #4d3a10;
+  --color-on-review-container: #fbd991;
+  --color-outline: #5b6472;
+  --color-outline-variant: #333a44;
+  --color-success: #4ade80;
+}
+
+:root[data-theme="dark"] .prose-slate {
+  --tw-prose-body: var(--color-on-surface);
+  --tw-prose-headings: var(--color-on-surface);
+  --tw-prose-lead: var(--color-on-surface-variant);
+  --tw-prose-links: var(--color-primary);
+  --tw-prose-bold: var(--color-on-surface);
+  --tw-prose-counters: var(--color-on-surface-variant);
+  --tw-prose-bullets: var(--color-on-surface-variant);
+  --tw-prose-hr: var(--color-outline-variant);
+  --tw-prose-quotes: var(--color-on-surface);
+  --tw-prose-quote-borders: var(--color-outline);
+  --tw-prose-captions: var(--color-on-surface-variant);
+  --tw-prose-code: var(--color-on-surface);
+  --tw-prose-pre-code: var(--color-on-surface);
+  --tw-prose-pre-bg: var(--color-surface-variant);
+  --tw-prose-th-borders: var(--color-outline);
+  --tw-prose-td-borders: var(--color-outline-variant);
 }
 
 body {
