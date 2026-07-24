@@ -137,20 +137,37 @@ function RepositoriesCard({ record }: { record: OnboardingRecord }) {
         </div>
         <span className="text-label-large text-on-surface-variant">{record.project.repositories.length} connected</span>
       </div>
-      <div className="overflow-hidden rounded-md border border-outline-variant">
-        <div className="hidden grid-cols-[1.4fr_0.7fr_1fr] gap-4 bg-surface-variant px-4 py-3 text-label-large font-medium text-on-surface-variant sm:grid">
-          <span>Repository</span><span>Access</span><span>Setup</span>
-        </div>
-        {record.project.repositories.map((repo) => (
-          <div key={repo.name} className="grid gap-2 border-t border-outline-variant px-4 py-4 first:border-t-0 sm:grid-cols-[1.4fr_0.7fr_1fr] sm:items-center sm:gap-4">
-            <div>
-              <p className="text-body-medium font-semibold text-on-surface">{repo.name}</p>
-              <p className="mt-1 text-label-large text-on-surface-variant">{repo.description}</p>
-            </div>
-            <Chip tone="secondary">{record.profile.permissions.repositories.access}</Chip>
-            <code className="overflow-x-auto rounded-md bg-surface-variant px-3 py-2 text-label-large text-on-surface-variant">{repo.bootstrap} · {repo.test}</code>
-          </div>
-        ))}
+      <div role="region" aria-label="Repositories table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
+        <table className="min-w-[640px] w-full border-collapse text-left">
+          <caption className="sr-only">Repositories and setup commands</caption>
+          <thead className="bg-surface-variant text-label-large font-medium text-on-surface-variant">
+            <tr>
+              <th scope="col" className="px-4 py-3">Repository</th>
+              <th scope="col" className="px-4 py-3">Access</th>
+              <th scope="col" className="px-4 py-3">Setup</th>
+            </tr>
+          </thead>
+          <tbody className="text-body-medium text-on-surface">
+            {record.project.repositories.length > 0 ? record.project.repositories.map((repo) => (
+              <tr key={repo.name} className="border-t border-outline-variant align-top">
+                <td className="px-4 py-4">
+                  <p className="font-semibold">{repo.name}</p>
+                  <p className="mt-1 text-label-large text-on-surface-variant">{repo.description}</p>
+                </td>
+                <td className="whitespace-nowrap px-4 py-4">{record.profile.permissions.repositories.access}</td>
+                <td className="px-4 py-4">
+                  <code className="block whitespace-normal rounded-md bg-surface-variant px-3 py-2 text-label-large text-on-surface-variant">
+                    {repo.bootstrap} · {repo.test}
+                  </code>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={3} className="px-4 py-4 text-on-surface-variant">No repositories connected.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </Card>
   );
@@ -158,6 +175,12 @@ function RepositoriesCard({ record }: { record: OnboardingRecord }) {
 
 function PermissionsCard({ record }: { record: OnboardingRecord }) {
   const { permissions } = record.profile;
+  const permissionRows = [
+    ...permissions.aws.map((permission, index) => ({ permission, system: "AWS", key: `aws-${permission}-${index}` })),
+    { permission: permissions.repositories.access, system: "Repositories", key: `repositories-${permissions.repositories.access}` },
+    ...permissions.ci_cd.map((permission, index) => ({ permission, system: "CI/CD", key: `ci-cd-${permission}-${index}` })),
+  ];
+
   return (
     <Card className="mb-5">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -167,23 +190,35 @@ function PermissionsCard({ record }: { record: OnboardingRecord }) {
         </div>
         <Chip tone={isApprovedStatus(record.status) ? "primary" : "secondary"}>{isApprovedStatus(record.status) ? "Approved" : "Pending"}</Chip>
       </div>
-      <div className="grid gap-5 md:grid-cols-3">
-        <PermissionGroup label="AWS" items={permissions.aws} />
-        <PermissionGroup label="Repositories" items={[permissions.repositories.access]} />
-        <PermissionGroup label="CI/CD" items={permissions.ci_cd} />
+      <div role="region" aria-label="Permissions table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
+        <table className="min-w-[560px] w-full border-collapse text-left">
+          <caption className="sr-only">Requested or approved permissions by system</caption>
+          <thead className="bg-surface-variant text-label-large font-medium text-on-surface-variant">
+            <tr>
+              <th scope="col" className="px-4 py-3">Permission</th>
+              <th scope="col" className="px-4 py-3">System</th>
+              <th scope="col" className="px-4 py-3">Included</th>
+            </tr>
+          </thead>
+          <tbody className="text-body-medium text-on-surface">
+            {permissionRows.length > 0 ? permissionRows.map((row) => (
+              <tr key={row.key} className="border-t border-outline-variant">
+                <td className="break-words px-4 py-3">{row.permission}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{row.system}</td>
+                <td className="px-4 py-3">
+                  <span className="sr-only">Included</span>
+                  <span aria-hidden="true" className="font-semibold text-primary">✓</span>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-on-surface-variant">No permissions listed.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </Card>
-  );
-}
-
-function PermissionGroup({ label, items }: { label: string; items: string[] }) {
-  return (
-    <div>
-      <p className="mb-2 text-label-large font-medium text-on-surface-variant">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => <span key={item} className="rounded-md border border-outline-variant bg-surface-variant px-2.5 py-1 text-label-large text-on-surface">{item}</span>)}
-      </div>
-    </div>
   );
 }
 
