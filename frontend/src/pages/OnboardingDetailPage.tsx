@@ -13,46 +13,53 @@ import {
 import type { OnboardingRecord, OnboardingStatus, ProgressEvent } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { ChatPanel } from "../components/ChatPanel";
 import { Chip } from "../components/Chip";
-import { Collapsible } from "../components/Collapsible";
 import { IconButton } from "../components/IconButton";
-import { Markdown } from "../components/Markdown";
-import { ProgressLog } from "../components/ProgressLog";
 import { Spinner } from "../components/Spinner";
-import { TextField } from "../components/TextField";
 import { TrashIcon } from "../components/TrashIcon";
 import { isApprovedStatus, statusTone } from "../statusDisplay";
+
+const progressStages: Array<{ status: OnboardingStatus; label: string }> = [
+  { status: "draft", label: "Draft" },
+  { status: "pending_approval", label: "Review" },
+  { status: "ready_for_day_1", label: "Ready for day 1" },
+  { status: "in_progress", label: "In progress" },
+  { status: "completed", label: "Completed" },
+];
 
 function BulletList({ items }: { items: string[] }) {
   if (items.length === 0) {
     return <p className="text-body-medium text-on-surface-variant">None.</p>;
   }
   return (
-    <ul className="list-disc space-y-1 pl-5 text-body-medium text-on-surface">
+    <ul className="space-y-2 text-body-medium text-on-surface">
       {items.map((item, i) => (
-        <li key={i}>{item}</li>
+        <li key={i} className="flex gap-2">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          <span>{item}</span>
+        </li>
       ))}
     </ul>
   );
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="mb-3 text-title-medium font-medium text-on-surface">{children}</h2>;
+  return <h2 className="text-title-medium font-semibold text-on-surface">{children}</h2>;
 }
 
-interface ProgressEntry {
-  status: OnboardingStatus;
-  timestamp: string;
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** Derives the Progress timeline from actionLog, plus (if applicable) the
- * synthetic read-time ready_for_day_1 -> in_progress flip, which is never
- * itself written to actionLog (see Story 1.4). */
-function buildProgressEntries(record: OnboardingRecord): ProgressEntry[] {
-  const entries: ProgressEntry[] = record.actionLog
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function buildProgressEntries(record: OnboardingRecord): Array<{ status: OnboardingStatus; timestamp: string }> {
+  const entries = record.actionLog
     .filter((entry) => entry.toStatus !== undefined)
     .map((entry) => ({ status: entry.toStatus as OnboardingStatus, timestamp: entry.timestamp }));
-
   const hasLoggedInProgress = entries.some((entry) => entry.status === "in_progress");
   const hasReadyForDayOne = entries.some((entry) => entry.status === "ready_for_day_1");
   if (
@@ -69,13 +76,197 @@ function buildProgressEntries(record: OnboardingRecord): ProgressEntry[] {
       entries.splice(completedIndex, 0, syntheticEntry);
     }
   }
-
   return entries;
 }
 
-function formatProgressTimestamp(timestamp: string): string {
-  const value = /^\d{4}-\d{2}-\d{2}$/.test(timestamp) ? `${timestamp}T00:00:00` : timestamp;
-  return new Date(value).toLocaleString();
+function ProgressCard({ record }: { record: OnboardingRecord }) {
+  const currentIndex = progressStages.findIndex((stage) => stage.status === record.status);
+  const progressEntries = buildProgressEntries(record);
+  const latestProgress = progressEntries[progressEntries.length - 1];
+
+  return (
+    <Card className="mb-5">
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <div>
+          <SectionTitle>Onboarding progress</SectionTitle>
+          <p className="mt-1 text-body-medium text-on-surface-variant">
+            {latestProgress ? `Last updated ${formatDateTime(latestProgress.timestamp)}` : "Plan created and ready for review."}
+          </p>
+        </div>
+        <Chip tone={statusTone(record.status)}>{record.status.replaceAll("_", " ")}</Chip>
+      </div>
+      {record.status === "blocked" ? (
+        <div className="rounded-md border border-error bg-error-container p-4 text-body-medium text-on-error-container">
+          Generation is blocked. Retry generation to create a plan before continuing.
+        </div>
+      ) : (
+        <div className="grid grid-cols-5 gap-2">
+          {progressStages.map((stage, index) => {
+            const complete = currentIndex >= index;
+            const active = currentIndex === index;
+            return (
+              <div key={stage.status} className="relative flex min-w-0 flex-col items-center gap-2">
+                {/* items-center keeps the dot centered in its column so the line below, positioned at left:-50%/right:50%, actually meets the dot centers */}
+                {index > 0 && (
+                  <span className={`absolute left-[-50%] right-[50%] top-3 h-px ${currentIndex >= index ? "bg-primary" : "bg-outline-variant"}`} />
+                )}
+                <span className={`relative z-[1] h-6 w-6 rounded-full border-2 ${complete ? "border-primary bg-primary" : "border-outline bg-surface-container"}`}>
+                  {complete && <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-on-primary" />}
+                </span>
+                <span className={`text-center text-label-large ${active ? "font-semibold text-on-surface" : "text-on-surface-variant"}`}>{stage.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function RepositoriesCard({ record }: { record: OnboardingRecord }) {
+  return (
+    <Card className="mb-5">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <SectionTitle>Repositories</SectionTitle>
+          <p className="mt-1 text-body-medium text-on-surface-variant">Codebases and setup commands for the first week.</p>
+        </div>
+        <span className="text-label-large text-on-surface-variant">{record.project.repositories.length} connected</span>
+      </div>
+      <div className="overflow-hidden rounded-md border border-outline-variant">
+        <div className="hidden grid-cols-[1.4fr_0.7fr_1fr] gap-4 bg-surface-variant px-4 py-3 text-label-large font-medium text-on-surface-variant sm:grid">
+          <span>Repository</span><span>Access</span><span>Setup</span>
+        </div>
+        {record.project.repositories.map((repo) => (
+          <div key={repo.name} className="grid gap-2 border-t border-outline-variant px-4 py-4 first:border-t-0 sm:grid-cols-[1.4fr_0.7fr_1fr] sm:items-center sm:gap-4">
+            <div>
+              <p className="text-body-medium font-semibold text-on-surface">{repo.name}</p>
+              <p className="mt-1 text-label-large text-on-surface-variant">{repo.description}</p>
+            </div>
+            <Chip tone="secondary">{record.profile.permissions.repositories.access}</Chip>
+            <code className="overflow-x-auto rounded-md bg-surface-variant px-3 py-2 text-label-large text-on-surface-variant">{repo.bootstrap} · {repo.test}</code>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function PermissionsCard({ record }: { record: OnboardingRecord }) {
+  const { permissions } = record.profile;
+  return (
+    <Card className="mb-5">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
+          <p className="mt-1 text-body-medium text-on-surface-variant">Access needed to contribute safely from day one.</p>
+        </div>
+        <Chip tone={isApprovedStatus(record.status) ? "primary" : "secondary"}>{isApprovedStatus(record.status) ? "Approved" : "Pending"}</Chip>
+      </div>
+      <div className="grid gap-5 md:grid-cols-3">
+        <PermissionGroup label="AWS" items={permissions.aws} />
+        <PermissionGroup label="Repositories" items={[permissions.repositories.access]} />
+        <PermissionGroup label="CI/CD" items={permissions.ci_cd} />
+      </div>
+    </Card>
+  );
+}
+
+function PermissionGroup({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-label-large font-medium text-on-surface-variant">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => <span key={item} className="rounded-md border border-outline-variant bg-surface-variant px-2.5 py-1 text-label-large text-on-surface">{item}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function ChecklistCard({ title, items }: { title: string; items: string[] }) {
+  return (
+    <Card>
+      <SectionTitle>{title}</SectionTitle>
+      <ul className="mt-4 space-y-3">
+        {items.map((item) => (
+          <li key={item} className="flex gap-3 text-body-medium text-on-surface">
+            <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-outline" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "onboarding";
+}
+
+function HistoryModal({ record, onClose }: { record: OnboardingRecord; onClose: () => void }) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onCloseRef.current();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-on-surface/40 p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <Card
+        className="max-h-[80vh] w-full max-w-lg overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Onboarding history"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <SectionTitle>History</SectionTitle>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label="Close history"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+        {record.actionLog.length > 0 ? (
+          <div className="space-y-4 border-l border-outline-variant pl-5">
+            {record.actionLog.map((entry) => (
+              <div key={entry.id} className="relative">
+                <span className="absolute -left-[26px] top-1 h-2.5 w-2.5 rounded-full border-2 border-surface-container bg-primary" />
+                <p className="text-label-large text-on-surface-variant">{formatDateTime(entry.timestamp)} · {entry.actor === "manager" ? "Manager" : "System"}</p>
+                <p className="mt-1 text-body-medium text-on-surface">{entry.message}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-body-medium text-on-surface-variant">No activity has been recorded yet.</p>
+        )}
+      </Card>
+    </div>
+  );
 }
 
 export function OnboardingDetailPage() {
@@ -92,21 +283,20 @@ export function OnboardingDetailPage() {
   const [sendingChat, setSendingChat] = useState(false);
   const [chatEvents, setChatEvents] = useState<ProgressEvent[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const currentIdRef = useRef(id);
+  const historyTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Track the current onboarding id so an in-flight chat send (or its
-    // progress callback) started against a previous id can detect a
-    // navigation away and skip applying its result to the wrong record.
     currentIdRef.current = id;
     setChatMessage("");
     setChatEvents([]);
     setChatError(null);
     setSendingChat(false);
+    setLastSentMessage(null);
     if (!id) return;
-    getOnboarding(id)
-      .then(setRecord)
-      .catch((err) => setError(err.message));
+    getOnboarding(id).then(setRecord).catch((err) => setError(err.message));
   }, [id]);
 
   async function handleApprove() {
@@ -114,11 +304,7 @@ export function OnboardingDetailPage() {
     setApproving(true);
     try {
       const updated = await approveOnboarding(id);
-      navigate("/", {
-        state: {
-          toastMessage: `Approved and sent to ${updated.employeeEmail}.`,
-        },
-      });
+      navigate("/", { state: { toastMessage: `Approved and sent to ${updated.employeeEmail}.` } });
     } catch (err) {
       setError((err as Error).message);
       setApproving(false);
@@ -129,8 +315,7 @@ export function OnboardingDetailPage() {
     if (!id) return;
     setSendingForApproval(true);
     try {
-      const updated = await sendForApproval(id);
-      setRecord(updated);
+      setRecord(await sendForApproval(id));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -139,10 +324,7 @@ export function OnboardingDetailPage() {
   }
 
   async function handleDelete() {
-    if (!id || !record) return;
-    if (!window.confirm(`Delete the onboarding for ${record.employeeName}? This can't be undone.`)) {
-      return;
-    }
+    if (!id || !record || !window.confirm(`Delete the onboarding for ${record.employeeName}? This can't be undone.`)) return;
     setDeleting(true);
     try {
       await deleteOnboarding(id);
@@ -157,8 +339,7 @@ export function OnboardingDetailPage() {
     if (!id) return;
     setRetrying(true);
     try {
-      const updated = await retryGeneration(id, () => undefined);
-      setRecord(updated);
+      setRecord(await retryGeneration(id, () => undefined));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -170,8 +351,7 @@ export function OnboardingDetailPage() {
     if (!id) return;
     setCompleting(true);
     try {
-      const updated = await markCompleted(id);
-      setRecord(updated);
+      setRecord(await markCompleted(id));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -179,17 +359,37 @@ export function OnboardingDetailPage() {
     }
   }
 
+  function handleDownloadPlan() {
+    if (!record) return;
+    const plan = record.narrative ?? record.plan;
+    const slug = slugify(record.employeeName);
+    const blob = new Blob([plan], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}-onboarding-plan.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleCloseHistory() {
+    setHistoryOpen(false);
+    historyTriggerRef.current?.focus();
+  }
+
   async function handleSendChat() {
     const trimmed = chatMessage.trim();
     if (!id || !trimmed) return;
     const chatId = id;
+    setLastSentMessage(trimmed);
     setSendingChat(true);
     setChatError(null);
     setChatEvents([]);
     try {
       const updated = await sendChatMessage(chatId, trimmed, (event) => {
-        if (currentIdRef.current !== chatId) return;
-        setChatEvents((prev) => [...prev, event]);
+        if (currentIdRef.current === chatId) setChatEvents((prev) => [...prev, event]);
       });
       if (currentIdRef.current !== chatId) return;
       setRecord(updated);
@@ -197,282 +397,153 @@ export function OnboardingDetailPage() {
     } catch (err) {
       if (currentIdRef.current !== chatId) return;
       setChatError((err as Error).message);
-      // The chat attempt may have failed *after* the backend already
-      // committed a side effect (e.g. reverting pending_approval -> draft
-      // before the agent call even started) — refetch so the page reflects
-      // the true current state rather than the stale one it had before the
-      // attempt, even though the revision itself didn't apply.
       try {
         const refreshed = await getOnboarding(chatId);
         if (currentIdRef.current === chatId) setRecord(refreshed);
       } catch {
-        // best-effort refresh; the chat error above still surfaces regardless
+        // The original chat error remains visible when the best-effort refresh fails.
       }
     } finally {
       if (currentIdRef.current === chatId) setSendingChat(false);
     }
   }
 
-  if (error) {
-    return (
-      <div className="p-8">
-        <Card tint="error">{error}</Card>
-      </div>
-    );
-  }
+  if (error) return <div className="mx-auto max-w-7xl p-8"><Card tint="error">{error}</Card></div>;
+  if (!record) return <Spinner label="Loading onboarding..." />;
 
-  if (!record) {
-    return <Spinner label="Loading onboarding..." />;
-  }
-
-  const { profile, project } = record;
-  const progressEntries = buildProgressEntries(record);
-  // Every status-changing action on this page (including chat, which can
-  // trigger a pending_approval -> draft revert) must block every other one —
-  // otherwise two concurrent requests can race and leave stale UI state.
   const otherActionInFlight = sendingForApproval || approving || retrying || completing || deleting;
   const anyActionInFlight = otherActionInFlight || sendingChat;
 
+  const canSendForApproval = record.status === "draft";
+  const canApprove = record.status === "pending_approval";
+  const approveSlotEnabled = canSendForApproval || canApprove;
+  const approveLabel = canSendForApproval
+    ? "Send for approval"
+    : canApprove
+      ? "Approve & send to employee"
+      : isApprovedStatus(record.status)
+        ? "Approved"
+        : "Approval unavailable";
+  const approveDisabledReason = approveSlotEnabled
+    ? undefined
+    : isApprovedStatus(record.status)
+      ? "This onboarding has already been approved."
+      : "Retry generation before this onboarding can be approved.";
+  const approveHandler = canSendForApproval ? handleSendForApproval : handleApprove;
+  const approveInFlight = canSendForApproval ? sendingForApproval : approving;
+  const approveLoadingLabel = canSendForApproval ? "Sending..." : "Approving...";
+  const canComplete = record.status === "in_progress";
+  const completeDisabledReason = canComplete
+    ? undefined
+    : record.status === "completed"
+      ? "This onboarding is already complete."
+      : record.status === "blocked"
+        ? "Retry generation before this onboarding can be completed."
+        : record.status === "ready_for_day_1"
+          ? "This onboarding becomes completable once it's in progress."
+          : "Approve this onboarding before marking it complete.";
+  const canRetry = record.status === "blocked";
+
   return (
-    <div className="mx-auto max-w-5xl p-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-headline-small font-medium text-on-surface">{record.employeeName}</h1>
-          <p className="text-body-medium text-on-surface-variant">
-            {record.employeeEmail} &middot; {profile.name} &middot; {project.name}
-          </p>
-          <p className="text-body-medium text-on-surface-variant">
-            Created {new Date(record.createdAt).toLocaleString()}
-          </p>
-        </div>
-        <Chip tone={statusTone(record.status)}>{record.status}</Chip>
-      </div>
-
-      {(record.startDate || record.buddyEmail || record.seniority || record.location || record.notes) && (
-        <Card className="mb-6">
-          <SectionTitle>Additional details</SectionTitle>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-body-medium">
-            {record.startDate && (
-              <>
-                <dt className="text-on-surface-variant">Start date</dt>
-                <dd className="text-on-surface">{record.startDate}</dd>
-              </>
-            )}
-            {record.buddyEmail && (
-              <>
-                <dt className="text-on-surface-variant">Buddy</dt>
-                <dd className="text-on-surface">{record.buddyEmail}</dd>
-              </>
-            )}
-            {record.seniority && (
-              <>
-                <dt className="text-on-surface-variant">Seniority</dt>
-                <dd className="text-on-surface">{record.seniority}</dd>
-              </>
-            )}
-            {record.location && (
-              <>
-                <dt className="text-on-surface-variant">Location</dt>
-                <dd className="text-on-surface">{record.location}</dd>
-              </>
-            )}
-            {record.notes && (
-              <>
-                <dt className="text-on-surface-variant">Notes</dt>
-                <dd className="col-span-2 text-on-surface">{record.notes}</dd>
-              </>
-            )}
-          </dl>
-        </Card>
-      )}
-
-      {record.notification && (
-        <Card tint="primary" className="mb-6">
-          Sent to <strong>{record.notification.sentTo}</strong> at{" "}
-          {new Date(record.notification.sentAt).toLocaleTimeString()}.
-        </Card>
-      )}
-
-      <Card className="mb-6">
-        <SectionTitle>Progress</SectionTitle>
-        <div className="flex flex-col gap-2">
-          {progressEntries.map((entry, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="text-body-medium text-on-surface-variant">
-                {formatProgressTimestamp(entry.timestamp)}
-              </span>
-              <Chip tone={statusTone(entry.status)}>{entry.status}</Chip>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card tint="primary" className="mb-6">
-        <p className="mb-2 text-label-large font-medium text-on-primary-container/80">
-          Generated by Strands Agent (Amazon Bedrock)
-        </p>
-        {record.narrative ? (
-          <Markdown>{record.narrative}</Markdown>
-        ) : (
-          <p className="text-body-medium italic">
-            Agent narrative unavailable: {record.narrativeError}
-          </p>
-        )}
-      </Card>
-
-      {record.events && record.events.length > 0 && (
-        <Card className="mb-6">
-          <Collapsible label={`Agent console (${record.events.length} messages)`}>
-            <ProgressLog events={record.events} live={false} />
-          </Collapsible>
-        </Card>
-      )}
-
-      <Card className="mb-6">
-        <Collapsible label={`Action log (${record.actionLog.length} entries)`}>
-          <div className="flex flex-col gap-2">
-            {record.actionLog.map((entry) => (
-              <div key={entry.id} className="text-body-medium">
-                <span className="text-on-surface-variant">
-                  {new Date(entry.timestamp).toLocaleString()} &middot;{" "}
-                  {entry.actor === "manager" ? "Manager" : "System"} &middot;{" "}
-                </span>
-                <span className="text-on-surface">{entry.message}</span>
-              </div>
-            ))}
-          </div>
-        </Collapsible>
-      </Card>
-
-      {record.status !== "blocked" && (
-        <Card className="mb-6">
-          <Collapsible label="Revise plan via chat">
-            {record.status === "draft" || record.status === "pending_approval" ? (
-              <div className="flex flex-col gap-3">
-                <TextField
-                  label="Message"
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  disabled={anyActionInFlight}
-                  placeholder="e.g. drop the internal-tools repo, they won't touch it in month one"
-                />
-                <Button
-                  onClick={handleSendChat}
-                  disabled={anyActionInFlight || !chatMessage.trim()}
-                  className="self-start"
+    <div className="mx-auto max-w-[1680px] p-6 lg:p-8">
+      <div className="flex items-start gap-6">
+        <main className="min-w-0 max-w-[1100px] flex-1">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="mb-2 text-label-large font-medium text-primary">People / Onboarding workspace</p>
+              <h1 className="text-headline-small font-semibold text-on-surface">{record.employeeName}</h1>
+              <p className="mt-1 text-body-medium text-on-surface-variant">{record.employeeEmail} · {record.profile.name}</p>
+              <p className="mt-2 inline-flex items-center gap-2 text-label-large text-on-surface-variant">
+                <span className="rounded-xs bg-primary-container px-2 py-0.5 text-label-large font-medium text-on-primary-container">Project</span>
+                {record.project.name}
+              </p>
+              <p className="mt-1 text-label-large text-on-surface-variant">Created {formatDate(record.createdAt)}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-label-large">
+                <button
+                  ref={historyTriggerRef}
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
                 >
-                  {sendingChat ? "Sending..." : "Send"}
-                </Button>
-                {chatError && <Card tint="error">{chatError}</Card>}
-                {chatEvents.length > 0 && <ProgressLog events={chatEvents} live={sendingChat} />}
+                  View history
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPlan}
+                  className="rounded-md px-1 -mx-1 font-medium text-primary hover:bg-primary-container/30"
+                >
+                  Download plan (.md)
+                </button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-body-medium text-on-surface-variant">
-                  This onboarding has been approved — chat is now read-only.
-                </p>
-                {record.actionLog
-                  .filter((entry) => entry.type === "chat_message")
-                  .map((entry) => (
-                    <div key={entry.id} className="text-body-medium">
-                      <span className="text-on-surface-variant">
-                        {new Date(entry.timestamp).toLocaleString()} &middot;{" "}
-                        {entry.actor === "manager" ? "Manager" : "System"} &middot;{" "}
-                      </span>
-                      <span className="text-on-surface">{entry.message}</span>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </Collapsible>
-        </Card>
-      )}
-
-      <Card className="mb-6">
-        <SectionTitle>Repositories</SectionTitle>
-        <div className="flex flex-col gap-4">
-          {project.repositories.map((repo) => (
-            <div key={repo.name}>
-              <p className="font-medium text-on-surface">{repo.name}</p>
-              <p className="mb-2 text-body-medium text-on-surface-variant">{repo.description}</p>
-              <pre className="overflow-x-auto rounded-xs bg-surface-variant p-3 text-body-medium text-on-surface-variant">
-{`git clone ${repo.clone_url}
-cd ${repo.name}
-${repo.bootstrap}
-${repo.test}`}
-              </pre>
             </div>
-          ))}
-        </div>
-      </Card>
+            <div className="flex flex-wrap items-center gap-3">
+              <Chip tone={statusTone(record.status)}>{record.status.replaceAll("_", " ")}</Chip>
+              <Button
+                variant={approveSlotEnabled ? "filled" : "outlined"}
+                onClick={approveHandler}
+                disabled={anyActionInFlight || !approveSlotEnabled}
+                title={approveDisabledReason}
+              >
+                {approveInFlight ? approveLoadingLabel : approveLabel}
+              </Button>
+              <Button
+                variant={canComplete ? "filled" : "outlined"}
+                onClick={handleComplete}
+                disabled={anyActionInFlight || !canComplete}
+                title={completeDisabledReason}
+              >
+                {completing ? "Completing..." : "Mark complete"}
+              </Button>
+              {canRetry && (
+                <Button variant="filled" onClick={handleRetry} disabled={anyActionInFlight}>
+                  {retrying ? "Retrying..." : "Retry generation"}
+                </Button>
+              )}
+              <IconButton tone="error" aria-label="Delete onboarding" title="Delete onboarding" onClick={handleDelete} disabled={anyActionInFlight}>
+                <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
+              </IconButton>
+            </div>
+          </div>
 
-      <Card className="mb-6">
-        <SectionTitle>{isApprovedStatus(record.status) ? "Approved Permissions" : "Requested Permissions"}</SectionTitle>
-        <p className="mb-1 text-label-large text-on-surface-variant">AWS</p>
-        <BulletList items={profile.permissions.aws} />
-        <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Repository access</p>
-        <p className="text-body-medium text-on-surface">{profile.permissions.repositories.access}</p>
-        <p className="mb-1 mt-4 text-label-large text-on-surface-variant">CI/CD</p>
-        <BulletList items={profile.permissions.ci_cd} />
-      </Card>
+          {record.notification && <div className="mb-5 rounded-md border border-primary/20 bg-primary-container px-4 py-3 text-body-medium text-on-primary-container">Sent to <strong>{record.notification.sentTo}</strong> at {new Date(record.notification.sentAt).toLocaleTimeString()}.</div>}
 
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        <Card>
-          <SectionTitle>Day 1 checklist</SectionTitle>
-          <BulletList items={profile.base_checklist.day_1} />
-        </Card>
-        <Card>
-          <SectionTitle>Week 1 checklist</SectionTitle>
-          <BulletList items={profile.base_checklist.week_1} />
-        </Card>
+          <ProgressCard record={record} />
+          <RepositoriesCard record={record} />
+          <PermissionsCard record={record} />
+          <div className="mb-5 grid gap-5 md:grid-cols-2">
+            <ChecklistCard title="Day 1 checklist" items={record.profile.base_checklist.day_1} />
+            <ChecklistCard title="Week 1 checklist" items={record.profile.base_checklist.week_1} />
+          </div>
+          <Card className="mb-5">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div><SectionTitle>Suggested first tasks</SectionTitle><div className="mt-4"><BulletList items={record.project.first_tasks} /></div></div>
+              <div><SectionTitle>Suggested documentation</SectionTitle><div className="mt-4"><BulletList items={record.project.key_docs} /></div></div>
+            </div>
+          </Card>
+          <Card className="mb-5 border-amber-200 bg-amber-50">
+            <SectionTitle>Approvals and risks</SectionTitle>
+            <div className="mt-4 grid gap-6 md:grid-cols-2">
+              <div><p className="mb-2 text-label-large font-medium text-amber-900">Approvals required</p><BulletList items={record.profile.approvals_required} /></div>
+              <div><p className="mb-2 text-label-large font-medium text-amber-900">Project risk notes</p><BulletList items={record.project.risk_notes} /></div>
+            </div>
+          </Card>
+        </main>
+        <aside className="sticky top-16 h-[calc(100vh-4rem)] w-[440px] shrink-0 overflow-hidden">
+          <ChatPanel
+            status={record.status}
+            actionLog={record.actionLog}
+            chatMessage={chatMessage}
+            onChatMessageChange={setChatMessage}
+            onSend={handleSendChat}
+            sendingChat={sendingChat}
+            chatEvents={chatEvents}
+            chatError={chatError}
+            lastSentMessage={lastSentMessage}
+            otherActionInFlight={otherActionInFlight}
+          />
+        </aside>
       </div>
-
-      <Card className="mb-6">
-        <SectionTitle>Suggested first tasks</SectionTitle>
-        <BulletList items={project.first_tasks} />
-        <p className="mb-1 mt-4 text-label-large text-on-surface-variant">Suggested documentation</p>
-        <BulletList items={project.key_docs} />
-      </Card>
-
-      <Card tint="error" className="mb-6">
-        <SectionTitle>Approvals required &amp; risk notes</SectionTitle>
-        <p className="mb-1 text-label-large opacity-80">Approvals required by profile</p>
-        <BulletList items={profile.approvals_required} />
-        <p className="mb-1 mt-4 text-label-large opacity-80">Project risk notes</p>
-        <BulletList items={project.risk_notes} />
-      </Card>
-
-      <div className="flex items-center gap-3">
-        {record.status === "draft" && (
-          <Button onClick={handleSendForApproval} disabled={sendingForApproval || approving || retrying || completing || deleting || sendingChat}>
-            {sendingForApproval ? "Sending..." : "Send for approval"}
-          </Button>
-        )}
-        {record.status === "pending_approval" && (
-          <Button onClick={handleApprove} disabled={approving || retrying || completing || deleting || sendingChat}>
-            {approving ? "Approving..." : "Approve & send to employee"}
-          </Button>
-        )}
-        {record.status === "blocked" && (
-          <Button onClick={handleRetry} disabled={retrying || completing || deleting || sendingChat}>
-            {retrying ? "Retrying..." : "Retry generation"}
-          </Button>
-        )}
-        {record.status === "in_progress" && (
-          <Button onClick={handleComplete} disabled={completing || retrying || deleting || sendingChat}>
-            {completing ? "Completing..." : "Mark complete"}
-          </Button>
-        )}
-        <IconButton
-          tone="error"
-          aria-label="Delete onboarding"
-          title="Delete onboarding"
-          onClick={handleDelete}
-          disabled={sendingForApproval || approving || retrying || completing || deleting || sendingChat}
-        >
-          <TrashIcon className={`h-5 w-5 ${deleting ? "animate-pulse" : ""}`} />
-        </IconButton>
-      </div>
+      {historyOpen && <HistoryModal record={record} onClose={handleCloseHistory} />}
     </div>
   );
 }

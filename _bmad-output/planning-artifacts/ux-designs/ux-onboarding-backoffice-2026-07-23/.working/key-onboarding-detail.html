@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Key screen (v6): Onboarding detail — redesign direction</title>
+    <!--
+  Governs / traces to:
+  - Tokens: frontend/src/index.css @theme (inherited verbatim, light) + new dark-mode
+    token set (v6 addition, see body:has(#theme-toggle:checked) block below)
+  - Layout decisions: .memlog.md entries 1-39 (full history)
+  - v6: (1) Viewed-checkbox collapse now real (:has()-driven, no JS needed), (2) Heroicons
+    outline icons for trash/download/history/search/bell/sun/moon, (3) Plan chat is
+    position:sticky so it stays visible while the long main column scrolls, (4) dark mode
+    via a header sun/moon toggle (checkbox + :has(), still fully JS-free).
+  - State shown: main mock = pending_approval, light mode, Project context and Suggested
+    documentation pre-collapsed. Click the checkboxes / theme toggle to interact live.
+    States strip at bottom = draft/blocked/in_progress header variants.
+-->
+    <style>
+      :root {
+        --color-primary: #2457d6;
+        --color-on-primary: #ffffff;
+        --color-primary-container: #e7edff;
+        --color-on-primary-container: #173b9a;
+        --color-secondary: #667085;
+        --color-on-secondary: #ffffff;
+        --color-secondary-container: #eef2f7;
+        --color-on-secondary-container: #344054;
+        --color-surface: #f7f8fb;
+        --color-surface-container: #ffffff;
+        --color-on-surface: #101828;
+        --color-surface-variant: #f0f2f5;
+        --color-on-surface-variant: #667085;
+        --color-error: #b42318;
+        --color-on-error: #ffffff;
+        --color-error-container: #fee4e2;
+        --color-on-error-container: #912018;
+        --color-outline: #98a2b3;
+        --color-outline-variant: #e4e7ec;
+        --color-review-container: #fef3c7;
+        --color-on-review-container: #92400e;
+        --radius-xs: 4px;
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 28px;
+        --shadow-1:
+          0px 1px 2px 0px rgba(16, 24, 40, 0.05),
+          0px 1px 3px 1px rgba(16, 24, 40, 0.04);
+        --shadow-2:
+          0px 2px 4px 0px rgba(16, 24, 40, 0.06),
+          0px 4px 12px 0px rgba(16, 24, 40, 0.05);
+      }
+      /*
+  Dark-mode token set (new, v6). Driven by the in-app sun/moon toggle in the header
+  (a hidden checkbox + :has(), so this mock stays fully JS-free per key-screens.md)
+  rather than the viewer's OS/site theme preference — this toggle is an app feature,
+  not a wrapper around the artifact viewer's own dark mode.
+*/
+      body:has(#theme-toggle:checked) {
+        --color-primary: #9db8f5;
+        --color-on-primary: #0a2757;
+        --color-primary-container: #1d3f8f;
+        --color-on-primary-container: #dce6ff;
+        --color-secondary: #b0b8c4;
+        --color-on-secondary: #1f242c;
+        --color-secondary-container: #3a4149;
+        --color-on-secondary-container: #e3e7ed;
+        --color-surface: #0f141b;
+        --color-surface-container: #1a2029;
+        --color-on-surface: #e6e9ee;
+        --color-surface-variant: #242b35;
+        --color-on-surface-variant: #a6adb8;
+        --color-error: #ff8a80;
+        --color-on-error: #4e0b04;
+        --color-error-container: #6b1710;
+        --color-on-error-container: #ffd9d4;
+        --color-outline: #5b6472;
+        --color-outline-variant: #333a44;
+        --color-review-container: #4d3a10;
+        --color-on-review-container: #fbd991;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--color-surface);
+        color: var(--color-on-surface);
+        font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+      }
+      .browser-frame {
+        max-width: 1500px;
+        margin: 24px auto;
+        border: 1px solid var(--color-outline-variant);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-2);
+        background: var(--color-surface-container);
+      }
+      .browser-chrome {
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+      }
+      .browser-chrome {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--color-surface-variant);
+        border-bottom: 1px solid var(--color-outline-variant);
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--color-outline-variant);
+      }
+      .url {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--color-on-surface-variant);
+        background: var(--color-surface-container);
+        border: 1px solid var(--color-outline-variant);
+        border-radius: 999px;
+        padding: 3px 12px;
+      }
+
+      header.topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        padding: 0 32px;
+        background: var(--color-surface-container);
+        border-bottom: 1px solid var(--color-outline-variant);
+        box-shadow: var(--shadow-1);
+        overflow-x: auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 17px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .brand-mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--color-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .brand-mark span {
+        width: 14px;
+        height: 14px;
+        border: 3px solid var(--color-on-primary);
+        border-radius: 3px;
+        transform: rotate(45deg);
+      }
+      nav.primary {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        height: 100%;
+        margin-left: 40px;
+      }
+      nav.primary a {
+        font-size: 14px;
+        color: var(--color-on-surface-variant);
+        text-decoration: none;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      nav.primary a.active {
+        color: var(--color-on-surface);
+        font-weight: 500;
+        border-color: var(--color-primary);
+      }
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: var(--color-on-surface-variant);
+        flex-shrink: 0;
+      }
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--color-surface-variant);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .new-btn {
+        background: var(--color-primary);
+        color: var(--color-on-primary);
+        border-radius: 12px;
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: var(--shadow-1);
+        white-space: nowrap;
+      }
+
+      .layout {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 28px 32px;
+        display: flex;
+        align-items: flex-start;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      main {
+        flex: 1;
+        min-width: 320px;
+      }
+      .eyebrow {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-primary);
+        margin-bottom: 6px;
+      }
+      .page-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-size: 24px;
+        line-height: 32px;
+        font-weight: 600;
+        margin: 0;
+        text-wrap: balance;
+      }
+      .subline {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: var(--color-on-surface-variant);
+      }
+      .subline.small {
+        font-size: 13px;
+        margin-top: 2px;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .chip.review {
+        background: var(--color-review-container);
+        color: var(--color-on-review-container);
+      }
+      .btn {
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--color-primary);
+        color: var(--color-on-primary);
+        box-shadow: var(--shadow-1);
+      }
+      .btn.secondary {
+        background: var(--color-surface-container);
+        color: var(--color-on-surface);
+        border-color: var(--color-outline-variant);
+      }
+      .btn[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid var(--color-outline-variant);
+        background: var(--color-surface-container);
+        color: var(--color-error);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .card {
+        background: var(--color-surface-container);
+        border: 1px solid var(--color-outline-variant);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-1);
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .card-sub {
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+        margin: 2px 0 0;
+      }
+      .link {
+        color: var(--color-primary);
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .progress-row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+      }
+      .stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        position: relative;
+      }
+      .stage:not(:first-child)::before {
+        content: "";
+        position: absolute;
+        left: -50%;
+        right: 50%;
+        top: 11px;
+        height: 1px;
+        background: var(--color-outline-variant);
+      }
+      .stage.line-complete:not(:first-child)::before {
+        background: var(--color-primary);
+      }
+      .stage .dot2 {
+        position: relative;
+        z-index: 1;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid var(--color-outline);
+        background: var(--color-surface-container);
+      }
+      .stage.complete .dot2 {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+      }
+      .stage .label {
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+        text-align: center;
+      }
+      .stage.active .label {
+        font-weight: 600;
+        color: var(--color-on-surface);
+      }
+
+      .summary-text {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--color-on-surface);
+        margin: 0;
+      }
+      .summary-text.clamp {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+      table.repo {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        min-width: 420px;
+      }
+      table.repo th {
+        text-align: left;
+        color: var(--color-on-surface-variant);
+        font-weight: 500;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-outline-variant);
+      }
+      table.repo td {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-outline-variant);
+      }
+      table.repo tr:last-child td {
+        border-bottom: none;
+      }
+      .badge {
+        display: inline-block;
+        background: var(--color-surface-variant);
+        color: var(--color-on-surface-variant);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 12px;
+      }
+      .tick {
+        color: #16a34a;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .chips-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .perm-chip {
+        border: 1px solid var(--color-outline-variant);
+        background: var(--color-surface-variant);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+      .project-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+      }
+      .project-badge .tag {
+        background: var(--color-primary-container);
+        color: var(--color-on-primary-container);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .tasklist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .tasklist li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        flex-wrap: wrap;
+      }
+      .tasklist .box {
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid var(--color-outline);
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+      .due {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--color-on-surface-variant);
+      }
+
+      aside.chat {
+        width: 420px;
+        max-width: 100%;
+        flex-shrink: 0;
+        background: var(--color-surface-container);
+        border: 1px solid var(--color-outline-variant);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-1);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        position: sticky;
+        top: 20px;
+        height: calc(100vh - 40px);
+        max-height: 760px;
+      }
+      .chat-head {
+        border-bottom: 1px solid var(--color-outline-variant);
+        padding-bottom: 14px;
+      }
+      .chat-head-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .chat-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #10b981;
+        flex-shrink: 0;
+      }
+      .chat-body {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .bubble-you {
+        margin-left: auto;
+        max-width: 88%;
+        background: var(--color-primary-container);
+        color: var(--color-on-primary-container);
+        border-radius: 16px 16px 4px 16px;
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+      .bubble-agent {
+        max-width: 92%;
+        background: var(--color-secondary-container);
+        color: var(--color-on-secondary-container);
+        border-radius: 16px 16px 16px 4px;
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+      .bubble-label {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .tool-box {
+        background: #0b1220;
+        color: #d1fae5;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 12.5px;
+        font-family: ui-monospace, monospace;
+        overflow-x: auto;
+      }
+      .tool-box .ok {
+        color: #34d399;
+      }
+      .chat-input-row {
+        display: flex;
+        gap: 10px;
+        border-top: 1px solid var(--color-outline-variant);
+        padding-top: 14px;
+      }
+      .chat-input {
+        flex: 1;
+        border: 1px solid var(--color-outline);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 14px;
+        color: var(--color-on-surface-variant);
+      }
+      .send-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: var(--color-primary);
+        color: var(--color-on-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .caption {
+        max-width: 1500px;
+        margin: 0 auto 8px;
+        padding: 0 4px;
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+      }
+
+      .states-strip {
+        max-width: 1500px;
+        margin: 20px auto 0;
+        padding: 0 4px;
+      }
+      .states-strip h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .states-strip p.sub {
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+        margin: 0 0 12px;
+      }
+      .state-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        background: var(--color-surface-container);
+        border: 1px solid var(--color-outline-variant);
+        border-radius: var(--radius-md);
+        padding: 14px 18px;
+        margin-bottom: 10px;
+      }
+      .state-name {
+        font-size: 13px;
+        font-weight: 600;
+        width: 150px;
+        flex-shrink: 0;
+      }
+
+      .viewed-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--color-on-surface-variant);
+        white-space: nowrap;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .viewed-toggle input {
+        width: 16px;
+        height: 16px;
+        accent-color: #16a34a;
+        cursor: pointer;
+      }
+      .viewed-toggle .viewed-label::before {
+        content: "Viewed";
+      }
+      .viewed-toggle:has(input:checked) {
+        color: #16a34a;
+        font-weight: 600;
+      }
+      .viewed-toggle:has(input:checked) .viewed-label::before {
+        content: "Viewed";
+      }
+      /* Real collapse behavior, driven live by the checkbox — no JS. */
+      .card:has(> .card-head .viewed-toggle input:checked) {
+        background: var(--color-surface-variant);
+        box-shadow: none;
+        padding: 14px 20px;
+      }
+      .card:has(> .card-head .viewed-toggle input:checked) .card-body {
+        display: none;
+      }
+      .card:has(> .card-head .viewed-toggle input:checked) .card-head {
+        margin-bottom: 0;
+      }
+      .card:has(> .card-head .viewed-toggle input:checked) .card-title {
+        color: var(--color-on-surface-variant);
+      }
+      .sub-label {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--color-on-surface-variant);
+        margin: 0 0 6px;
+      }
+      .full-list {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .full-list:last-child {
+        margin-bottom: 0;
+      }
+      .full-list li {
+        display: flex;
+        gap: 8px;
+        font-size: 14px;
+        line-height: 20px;
+      }
+      .full-list li::before {
+        content: "•";
+        color: var(--color-outline);
+        flex-shrink: 0;
+      }
+      .download-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .icon {
+        width: 18px;
+        height: 18px;
+        display: inline-block;
+        vertical-align: -3px;
+        flex-shrink: 0;
+      }
+      .header-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: none;
+        color: var(--color-on-surface-variant);
+        cursor: pointer;
+      }
+      .header-icon-btn .icon {
+        width: 20px;
+        height: 20px;
+        vertical-align: middle;
+      }
+      .header-icon-btn:hover {
+        background: var(--color-surface-variant);
+      }
+      .theme-toggle-wrap {
+        position: relative;
+        display: inline-flex;
+      }
+      .theme-toggle-wrap input {
+        position: absolute;
+        opacity: 0;
+        width: 36px;
+        height: 36px;
+        margin: 0;
+        cursor: pointer;
+      }
+      .theme-toggle-wrap .sun-icon {
+        display: block;
+      }
+      .theme-toggle-wrap .moon-icon {
+        display: none;
+      }
+      .theme-toggle-wrap:has(input:checked) .sun-icon {
+        display: none;
+      }
+      .theme-toggle-wrap:has(input:checked) .moon-icon {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="caption">
+      Key screen — onboarding detail, "pending approval" state, v6. Try it live:
+      click any "Viewed" checkbox to actually collapse that card (pure CSS, no
+      JS — Project context and Suggested documentation start pre-checked), and
+      click the sun/moon icon in the header to toggle real dark mode. Icons are
+      Heroicons-outline (Trash, Download, History, Search, Bell, Sun/Moon). Plan
+      chat is now `position:sticky` — scroll the page and it stays put. Full
+      plan card dropped in favor of a "Download plan (.md)" header link; Plan
+      generation note dropped entirely.
+    </p>
+    <div class="browser-frame">
+      <div class="browser-chrome">
+        <span class="dot"></span><span class="dot"></span
+        ><span class="dot"></span
+        ><span class="url"
+          >onboarding-backoffice.local/onboardings/maya-chen</span
+        >
+      </div>
+
+      <header class="topbar">
+        <div style="display: flex; align-items: center; height: 100%">
+          <div class="brand">
+            <span class="brand-mark"><span></span></span>IAVA Workshop
+          </div>
+          <nav class="primary">
+            <a href="#" class="active">People</a>
+            <a
+              href="#"
+              title="Plans are managed from each onboarding workspace."
+              >Plans</a
+            >
+            <a
+              href="#"
+              title="Tasks will appear here as onboarding tracking expands."
+              >Tasks</a
+            >
+            <a
+              href="#"
+              title="Reports will appear here as onboarding tracking expands."
+              >Reports</a
+            >
+            <a
+              href="#"
+              title="Settings will appear here as configuration expands."
+              >Settings</a
+            >
+          </nav>
+        </div>
+        <div class="topbar-right">
+          <button type="button" class="header-icon-btn" aria-label="Search">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21 21l-4.34-4.34m0 0A7.5 7.5 0 105.34 5.34a7.5 7.5 0 0011.32 11.32z"
+              />
+            </svg>
+          </button>
+          <label
+            class="theme-toggle-wrap header-icon-btn"
+            title="Toggle dark mode"
+          >
+            <input
+              type="checkbox"
+              id="theme-toggle"
+              aria-label="Toggle dark mode"
+            />
+            <svg
+              class="icon sun-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"
+              />
+            </svg>
+            <svg
+              class="icon moon-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"
+              />
+            </svg>
+          </label>
+          <button
+            type="button"
+            class="header-icon-btn"
+            aria-label="Notifications"
+            style="position: relative"
+          >
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+              />
+            </svg>
+            <span
+              style="
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--color-primary);
+              "
+            ></span>
+          </button>
+          <span class="avatar">IA</span>
+          <span class="new-btn">New onboarding</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <main>
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">People / Onboarding workspace</p>
+              <h1>Maya Chen</h1>
+              <p class="subline">maya.chen@company.com · Product Designer</p>
+              <p class="project-badge">
+                <span class="tag">Project</span> Design System Overhaul
+              </p>
+              <p class="subline small">
+                Created Jul 20, 2026 ·
+                <a class="link" href="#"
+                  ><svg
+                    class="icon"
+                    style="width: 14px; height: 14px; vertical-align: -2px"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  View history</a
+                >
+                ·
+                <a class="link download-link" href="#"
+                  ><svg
+                    class="icon"
+                    style="width: 14px; height: 14px; vertical-align: -2px"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                    />
+                  </svg>
+                  Download plan (.md)</a
+                >
+              </p>
+            </div>
+            <div class="actions">
+              <span class="chip review">pending approval</span>
+              <button class="btn primary">Approve</button>
+              <button class="btn secondary" disabled>Complete</button>
+              <span class="icon-btn"
+                ><svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  /></svg
+              ></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Onboarding progress</p>
+                <p class="card-sub">Last updated Jul 22, 3:40 PM</p>
+              </div>
+            </div>
+            <div class="progress-row">
+              <div class="stage complete active">
+                <span class="dot2"></span><span class="label">Draft</span>
+              </div>
+              <div class="stage complete active line-complete">
+                <span class="dot2"></span><span class="label">Review</span>
+              </div>
+              <div class="stage">
+                <span class="dot2"></span
+                ><span class="label">Ready for day 1</span>
+              </div>
+              <div class="stage">
+                <span class="dot2"></span><span class="label">In progress</span>
+              </div>
+              <div class="stage">
+                <span class="dot2"></span><span class="label">Completed</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">First tasks</p>
+                <p class="card-sub">Suggested first tasks for this project.</p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" /><span class="viewed-label"></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <ul class="full-list">
+                <li>Complete product design orientation</li>
+                <li>Review the design system and contribution guidelines</li>
+                <li>Meet the team and key collaborators</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Project context</p>
+                <p class="card-sub">
+                  Business goal and architecture summary for this project.
+                </p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" checked /><span
+                  class="viewed-label"
+                ></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <p class="sub-label">Business goal</p>
+              <p class="summary-text" style="margin-bottom: 16px">
+                Raise the design system to parity with the product team's
+                velocity by unifying token usage across web and mobile.
+              </p>
+              <p class="sub-label">Architecture summary</p>
+              <p class="summary-text">
+                Frontend is a React 19 + Tailwind v4 monorepo backed by a
+                component-library package published internally; onboarding here
+                means learning the token pipeline before touching any screen.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Repositories</p>
+                <p class="card-sub">
+                  Codebases and setup commands for the first week.
+                </p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" /><span class="viewed-label"></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <div class="table-scroll">
+                <table class="repo">
+                  <tr>
+                    <th>Repository</th>
+                    <th>Access</th>
+                    <th>Setup</th>
+                  </tr>
+                  <tr>
+                    <td>acme/design-tokens</td>
+                    <td><span class="badge">Read</span></td>
+                    <td>
+                      <code style="font-size: 12px"
+                        >npm install · npm test</code
+                      >
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>acme/design-system</td>
+                    <td><span class="badge">Read</span></td>
+                    <td>
+                      <code style="font-size: 12px"
+                        >npm install · npm test</code
+                      >
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Requested permissions</p>
+                <p class="card-sub">
+                  Access needed to contribute safely from day one.
+                </p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" /><span class="viewed-label"></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <div class="table-scroll">
+                <table class="repo">
+                  <tr>
+                    <th>Permission</th>
+                    <th>System</th>
+                    <th>Included</th>
+                  </tr>
+                  <tr>
+                    <td>s3:read</td>
+                    <td><span class="badge">AWS</span></td>
+                    <td><span class="tick">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td>ec2:describe</td>
+                    <td><span class="badge">AWS</span></td>
+                    <td><span class="tick">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td>read</td>
+                    <td><span class="badge">Repositories</span></td>
+                    <td><span class="tick">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td>pipeline:trigger</td>
+                    <td><span class="badge">CI/CD</span></td>
+                    <td><span class="tick">✓</span></td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Checklists</p>
+                <p class="card-sub">Day 1 and Week 1 onboarding checklist.</p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" /><span class="viewed-label"></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <p class="sub-label">Day 1</p>
+              <ul class="full-list">
+                <li>Get laptop and accounts provisioned</li>
+                <li>Meet your onboarding buddy</li>
+                <li>Read the team charter</li>
+              </ul>
+              <p class="sub-label">Week 1</p>
+              <ul class="full-list">
+                <li>Ship a first small design-token PR</li>
+                <li>Pair with a teammate on a live project</li>
+                <li>Attend design system critique</li>
+                <li>Set up local dev environment for acme/design-system</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Suggested documentation</p>
+                <p class="card-sub">Reading list for the first two weeks.</p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" checked /><span
+                  class="viewed-label"
+                ></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <ul class="full-list">
+                <li>Design system contribution guide</li>
+                <li>Token pipeline architecture doc</li>
+                <li>Component library versioning policy</li>
+                <li>Team charter and working agreements</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Approvals and risks</p>
+                <p class="card-sub">
+                  What needs sign-off, and what could go wrong.
+                </p>
+              </div>
+              <label class="viewed-toggle"
+                ><input type="checkbox" /><span class="viewed-label"></span
+              ></label>
+            </div>
+            <div class="card-body">
+              <p class="sub-label">Approvals required</p>
+              <ul class="full-list">
+                <li>Design lead sign-off on token pipeline access</li>
+                <li>Security review for CI/CD pipeline trigger permission</li>
+              </ul>
+              <p class="sub-label">Project risk notes</p>
+              <ul class="full-list">
+                <li>
+                  Token migration touches shared components used by 3 other
+                  teams
+                </li>
+                <li>
+                  No automated visual-regression tests yet on the design-system
+                  repo
+                </li>
+                <li>Figma-to-code handoff process is still manual</li>
+              </ul>
+            </div>
+          </div>
+        </main>
+
+        <aside class="chat">
+          <div class="chat-head">
+            <div class="chat-head-row">
+              <p class="chat-title">Plan chat</p>
+              <span class="status-dot" title="Agent available"></span>
+            </div>
+            <p class="subline small">
+              Ask the agent to adjust the plan or resolve issues.
+            </p>
+          </div>
+          <div class="chat-body">
+            <div class="bubble-you">
+              <p class="bubble-label">You asked</p>
+              Add read access to the acme/design-tokens repository.
+            </div>
+            <div class="bubble-agent">
+              <p class="bubble-label">✓ Plan updated</p>
+              acme/design-tokens (read) added.
+            </div>
+            <div class="bubble-you">
+              <p class="bubble-label">You asked</p>
+              Please add s3:read for the design-assets bucket and enable the
+              deploy-preview CI/CD pipeline.
+            </div>
+            <div class="tool-box">
+              Running tools<br /><span class="ok">✓</span>
+              aws.grant_permission<br /><span class="ok">✓</span>
+              cicd.enable_pipeline<br /><span class="ok">✓</span>
+              plan.update<br /><span class="ok"
+                >All tools completed successfully.</span
+              >
+            </div>
+            <div class="bubble-agent">
+              <p class="bubble-label">Onboarding agent</p>
+              Got it. I'll update the plan with S3 read access and the
+              deploy-preview pipeline.
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <div class="chat-input">Ask to revise the plan...</div>
+            <span class="send-btn">➤</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="states-strip">
+      <h3>Header action bar — other statuses</h3>
+      <p class="sub">
+        The mock above shows "pending approval." Approve/Complete/Delete are
+        always in this slot arrangement; only the labels, enabled state, and
+        Retry's presence change.
+      </p>
+      <div class="state-row">
+        <span class="state-name">draft</span>
+        <span
+          class="chip"
+          style="
+            background: var(--color-surface-variant);
+            color: var(--color-on-surface-variant);
+          "
+          >draft</span
+        >
+        <button class="btn primary">Send for approval</button>
+        <button class="btn secondary" disabled>Complete</button>
+        <span class="icon-btn"
+          ><svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+            /></svg
+        ></span>
+      </div>
+      <div class="state-row">
+        <span class="state-name">blocked</span>
+        <span
+          class="chip"
+          style="
+            background: var(--color-error-container);
+            color: var(--color-on-error-container);
+          "
+          >blocked</span
+        >
+        <button class="btn secondary" disabled>Approve</button>
+        <button class="btn secondary" disabled>Complete</button>
+        <button class="btn primary">Retry generation</button>
+        <span class="icon-btn"
+          ><svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+            /></svg
+        ></span>
+      </div>
+      <div class="state-row">
+        <span class="state-name">in_progress</span>
+        <span
+          class="chip"
+          style="
+            background: var(--color-primary-container);
+            color: var(--color-on-primary-container);
+          "
+          >in progress</span
+        >
+        <button class="btn secondary" disabled>Approve</button>
+        <button class="btn primary">Complete</button>
+        <span class="icon-btn"
+          ><svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+            /></svg
+        ></span>
+      </div>
+    </div>
+  </body>
+</html>

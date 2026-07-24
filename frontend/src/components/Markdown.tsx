@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
  * are still arriving tends to render as broken or flickering elements. */
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
+    <div className="prose prose-slate prose-sm max-w-none">
       <ReactMarkdown>{children}</ReactMarkdown>
     </div>
   );
