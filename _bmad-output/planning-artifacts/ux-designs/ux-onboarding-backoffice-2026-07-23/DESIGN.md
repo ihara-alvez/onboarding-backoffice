@@ -2,7 +2,7 @@
 name: onboarding-backoffice
 description: MD3-flavored Tailwind v4 design system for the onboarding backoffice tool. This pass redesigns only the onboarding detail/workspace page and inherits the existing light-mode token system verbatim, adding a full dark-mode token set, a new full-content-by-default card pattern with a "Viewed" collapse affordance, and a Heroicons-outline icon adoption. Deltas only, not a replacement system.
 status: final
-updated: 2026-07-23
+updated: 2026-07-24
 colors:
   # Light mode — inherited verbatim from frontend/src/index.css @theme. Restated
   # here so component tokens below can reference them; values are not new.
@@ -180,7 +180,7 @@ components:
     badge-radius: '{rounded.sm}'
     tick-foreground: '{colors.success}'
     tick-foreground-dark: '{colors.success-dark}'
-    note: 'Shared shell for Repositories (Repository | Access | Setup — no "Last synced" column, no backing field on ProjectRepo) and Permissions (Permission | System | Included, replacing the old grouped-chips-by-category layout). The Permissions table''s "Included" column renders a {colors.success} tick glyph (RESOLVED — previously an untokenized literal, same token as viewed-checkbox above).'
+    note: 'Shared shell for Repositories (Repository | Access | Setup — no "Last synced" column, no backing field on ProjectRepo) and Permissions (Permission | System, replacing the old grouped-chips-by-category layout).'
   progress-stepper:
     dot-size: '24px'
     dot-border-inactive: '{colors.outline}'
@@ -221,7 +221,7 @@ Light-mode colors carry their existing meaning unchanged from the prior draft:
 
 **Dark mode (NEW, v6).** Every light color above has a `-dark` counterpart (see frontmatter), ported verbatim from the confirmed mock's toggle block — this system does not invent new dark values, it formalizes the mock's. The dark palette follows standard MD3 dark-theme logic: primary/secondary/error become lighter, less-saturated tints suitable for text-on-dark-surface (`#9db8f5`, `#b0b8c4`, `#ff8a80`) while their "container" pairs darken instead of lighten (`#1d3f8f`, `#3a4149`, `#6b1710`) so containers stay recessed relative to surface; the surface family inverts from near-white to near-black (`#f7f8fb`→`#0f141b`, `#ffffff`→`#1a2029`); outline/outline-variant darken and desaturate. `review-container` gets a dark counterpart (`#4d3a10` / on `#fbd991`) following the same container-darkens/on-color-lightens logic as the other container pairs.
 
-**Success (`#16a34a` / dark `#4ade80`) — RESOLVED.** Formalized as a semantic token (was previously an untokenized literal in the mock). Used only as a UI accent/glyph — the Viewed-checkbox's checked state and the Permissions table's "Included" tick — never as text, so it's held to WCAG's 3:1 non-text contrast bar against the surfaces it sits on, not the 4.5:1 text bar. Don't repurpose it for anything text-bearing without re-checking contrast.
+**Success (`#16a34a` / dark `#4ade80`) — RESOLVED.** Formalized as a semantic token (was previously an untokenized literal in the mock). Used only as a UI accent/glyph for the Viewed-checkbox's checked state, never as text, so it's held to WCAG's 3:1 non-text contrast bar against the surfaces it sits on, not the 4.5:1 text bar. Don't repurpose it for anything text-bearing without re-checking contrast.
 
 Avoid: introducing any other new hue without the same one-clear-semantic-meaning, one-place-it's-used deliberation `review-container` got.
 
@@ -254,11 +254,11 @@ Radius scale (`xs` 4 / `sm` 8 / `md` 12 / `lg` 16 / `xl` 28, plus Tailwind's `fu
 - **Header meta links** (`{components.header-meta-links}`) — "View history" (Clock icon) and "Download plan (.md)" (ArrowDownTray icon), one line, under the Project badge. Replace the old drill-in-link pattern entirely — there is no more "View all N tasks / View all N repositories" style link anywhere in this redesign.
 - **Project badge** (`{components.project-badge}`) — unchanged from the prior draft.
 - **Viewed checkbox + card collapse** (`{components.viewed-checkbox}`, `{components.card-viewed}`) — THE central new pattern. Every reviewable card gets a checkbox in its `card-head`. Checked → card enters `{components.card-viewed}` (surface-variant background, no shadow, reduced padding, body hidden, title dimmed to on-surface-variant). Unchecked → full expanded card, as always. **Implementation note, load-bearing:** the mock demonstrates this with a pure-CSS `:has()` selector because the mock has no JS. The real React implementation MUST drive this from actual component state (e.g., a `Set<string>` of viewed card ids, or one boolean per card) that conditionally renders/hides each card's body — not a CSS-only trick, since React components don't get the mock's DOM-shape luxury for free.
-- **Data table** (`{components.data-table}`) — Repositories: `Repository | Access | Setup` (real `bootstrap`/`test` commands from `ProjectRepo`, no "Last synced" column — no backing field exists). Permissions: `Permission | System | Included`, replacing the old grouped-chips-by-category layout; the standalone Approved/Pending chip stays dropped from the card header (redundant with the page-level status chip); the card title still swaps "Requested permissions" ↔ "Approved permissions" via the existing `isApprovedStatus()`.
+- **Data table** (`{components.data-table}`) — Repositories: `Repository | Access | Setup` (real `bootstrap`/`test` commands from `ProjectRepo`, no "Last synced" column — no backing field exists). Permissions: `Permission | System`, replacing the old grouped-chips-by-category layout; the standalone Approved/Pending chip stays dropped from the card header (redundant with the page-level status chip); the card title still swaps "Requested permissions" ↔ "Approved permissions" via the existing `isApprovedStatus()`.
 - **Progress stepper fix** (`{components.progress-stepper}`) — unchanged requirement from the prior draft: fix `align-items` to `center` in `frontend/src/pages/OnboardingDetailPage.tsx`'s `ProgressCard` so the connector line meets the dot centers.
 - **Icon library adoption** (`{components.icon-set}`) — Heroicons outline, 24×24 viewBox, stroke-width 1.5, round caps/joins. Replaces `TrashIcon.tsx` and `TopAppBar.tsx`'s hand-drawn Search/Bell SVGs. A genuinely new npm dependency (`@heroicons/react` or equivalent) — treat as a real dependency-management decision (licensing, bundle size, version pin), not a drop-in visual tweak.
 - **Header icon button shell + dark-mode toggle** (`{components.header-icon-btn}`, `{components.dark-mode-toggle}`) — new shared 36px circular-hover-bg shell for Search/theme-toggle/Notifications; the toggle itself swaps Sun↔Moon icons and drives the dark token set. See `EXPERIENCE.md` for the toggle's behavioral/persistence spec (flagged `[ASSUMPTION]`, not locked in).
-- **Plan chat** (`ChatPanel.tsx`) — behaviorally unchanged. Visually now `position:sticky`. **No real-code change needed here**: `frontend/src/pages/OnboardingDetailPage.tsx`'s aside is already `sticky top-16 h-[calc(100vh-4rem)]` in production. The mock's earlier fixed-height regression (noted in `.memlog.md` entry 43) was a mock-only bug, fixed in v6 — it was never a gap in the real app.
+- **Plan chat** (`ChatPanel.tsx`) — desktop behavior remains `position:sticky`; at tablet/mobile widths it returns to normal page flow. The send control uses a visible accessible send icon; Enter submits and Shift+Enter inserts a newline. Successful revisions, unrelated prompts, and failures use distinct outcome states.
 - **Unchanged, for reference only:** Card (expanded state), Button, IconButton, Chip's existing tones, and the Plan chat panel's internals are out of scope for this pass beyond the states already described.
 
 ## Do's and Don'ts
@@ -274,4 +274,12 @@ Radius scale (`xs` 4 / `sm` 8 / `md` 12 / `lg` 16 / `xl` 28, plus Tailwind's `fu
 | Add the full dark token set above, keyed off a real theme-state toggle | Wire the toggle to CSS `:has()` in production — that was a mock-only, JS-free workaround |
 | Trust the real components (Card, Button, IconButton) over the mock's raw CSS pixel values | Match the mock's bordered/square Delete button or its 12px card radius |
 | Reuse the existing "Running tools" live display in Plan chat | Add a separate "Agent console" card |
-| Use `{colors.success}` for the Viewed-checkbox and Included-tick accents only | Use it for text, or introduce a second green elsewhere without the same deliberation |
+| Use `{colors.success}` for the Viewed-checkbox accent only | Use it for text, or introduce a second green elsewhere without the same deliberation |
+
+## Epic 3 Follow-up Enhancements (2026-07-24)
+
+- **Response outcomes:** A successful plan revision may show “Plan updated”. Unrelated prompts use an informational/out-of-scope response and must never show a false success state; failures preserve the prior plan and show an error/clarification state. The outcome comes from an explicit response contract, not client-side keyword guessing.
+- **People refresh:** After a persisted plan revision, the detail and People/list data re-fetch through the existing API. Record identity and profile/project snapshot data remain unchanged.
+- **Permissions table:** The table now contains only `Permission | System`; the `Included` column, checkmark, and accessible label are removed.
+- **Status labels:** User-facing lifecycle labels are centralized as `Draft`, `Pending approval`, `Ready for day 1`, `In progress`, `Blocked`, and `Completed`; API/storage values remain unchanged.
+- **Responsive layout:** The desktop two-pane/sticky-chat composition remains. At tablet/mobile widths, the page becomes one column, chat returns to normal page flow, and header controls/tables/input wrap without page-level horizontal overflow.

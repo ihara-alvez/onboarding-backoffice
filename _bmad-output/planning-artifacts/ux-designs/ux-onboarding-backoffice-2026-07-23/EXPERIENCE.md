@@ -9,7 +9,7 @@ updated: 2026-07-23
 
 # Onboarding Backoffice — Experience Spine
 
-> Scoped redesign of a single existing page: the onboarding detail/workspace view (reached via the "People" nav item, one record at a time). The onboarding list page and every other nav tab (Plans/Tasks/Reports/Settings) are untouched by this pass. Paired with `DESIGN.md` (this system's token/component deltas over the existing MD3/Tailwind base). Where this spine, `DESIGN.md`, and the confirmed mock (`mockups/onboarding-detail.html`, v6) disagree, **the two spines win** — the mock is a Discovery-stage visual reference, not the contract. This is a full rewrite superseding an earlier draft of both spines: the earlier draft's central disclosure pattern ("summary + View X drill-in link") was tried, mocked, and explicitly reversed after user feedback — it no longer exists anywhere in this design.
+> Scoped redesign of the onboarding detail/workspace view (reached via the "People" nav item) plus its related People/list presentation. The follow-up decisions extend the v6 detail contract to cover chat submission/outcomes, persisted-plan refresh, responsive behavior, simplified permissions, and human-readable list statuses. Paired with `DESIGN.md` (this system's token/component deltas over the existing MD3/Tailwind base). Where this spine, `DESIGN.md`, and the confirmed mock (`mockups/onboarding-detail.html`, v6) disagree, **the two spines win** — the mock is a Discovery-stage visual reference, not the contract.
 
 ## Foundation
 
@@ -30,7 +30,7 @@ Within the onboarding detail/workspace page, top to bottom:
 3. **First tasks** (`project.first_tasks`) — directly under Progress, the manager's most actionable near-term content.
 4. **Onboarding context** (three labeled sub-sections: Business goal `project.business_goal`, Architecture summary `project.architecture_summary`, and Details) — restores content that briefly had no home after the old narrative card was dropped; placed here per `generate_onboarding_plan()`'s section order (business goal/architecture precede permissions/repos in the generated plan). The **Details** sub-section is a RESOLVED gap: it carries `profile.summary` ("Role focus") and, when present, `record.startDate` / `buddyEmail` / `seniority` / `location` / `notes` — the exact fields the old `OverviewCard` rendered, each conditionally shown only when present, same as today. This is the only card that mixes generator-output content (business goal/architecture) with record-level metadata (Details) — a deliberate exception, not a pattern to replicate elsewhere.
 5. **Repositories** (`{design.components.data-table}`: Repository | Access | Setup).
-6. **Permissions** (`{design.components.data-table}`: Permission | System | Included).
+6. **Permissions** (`{design.components.data-table}`: Permission | System).
 7. **Checklists** (`profile.base_checklist.day_1` + `.week_1`, two labeled sub-lists).
 8. **Suggested documentation** (`project.key_docs`).
 9. **Approvals and risks** (`profile.approvals_required` + `project.risk_notes`, two labeled sub-lists).
@@ -43,7 +43,7 @@ Removed from the page entirely, with no replacement card: Onboarding narrative (
 
 **RESOLVED** (was flagged as a new gap during the rewrite): `profile.summary` ("Role focus") and, when present, `record.startDate` / `buddyEmail` / `seniority` / `location` / `notes` — rendered today by `OverviewCard` — now live in Onboarding context's **Details** sub-section (see item 4 above), conditionally shown exactly as today. Nothing from the current page disappears silently.
 
-The Plan chat pane (`ChatPanel.tsx`) sits persistently alongside the main column, now `position:sticky` (see State/Component Patterns) — already true in the shipped code, not a new build.
+The Plan chat pane (`ChatPanel.tsx`) sits persistently alongside the main column, now `position:sticky` on desktop. At tablet/mobile widths it returns to normal page flow below the main content so it is not clipped by the fixed-width aside.
 
 → Composition reference: [`mockups/onboarding-detail.html`](mockups/onboarding-detail.html) (v6, user-confirmed). Note: the mock predates the Details sub-section decision (item 4 above) — that content is spine-only, not visually mocked. Spines win on conflict.
 
@@ -58,7 +58,7 @@ Microcopy only — visual voice lives in `DESIGN.md`.
 | "Download plan (.md)" | "Export" / "Full plan" (the card this replaces is gone, don't resurrect its name) |
 | "Approve & send to employee" (real button label, kept in full even though the mock abbreviates it to "Approve" for space) | Silently adopting the mock's shorthand as the real copy |
 | "Send for approval" (draft-status label in the same header slot) | A brand-new label unrelated to the existing `handleSendForApproval` copy |
-| Status chip text: plain status words ("pending approval", "blocked") | Cutesy status labels |
+| Status chip/list text: centralized human-readable labels ("Pending approval", "Ready for day 1", "In progress", "Blocked") | Raw snake_case values or cutesy status labels |
 | Same tone manager-to-manager and manager-to-system (no persona split — none is defined yet) | Inventing a distinct tone for a role that hasn't been designed |
 
 ## Component Patterns
@@ -99,7 +99,7 @@ Other in-flight states: button labels swap to their existing in-progress copy ("
 
 ## Interaction Primitives
 
-- Point-and-click only — no new keyboard shortcuts (none exist today; not in scope to add).
+- Chat keyboard behavior is explicit: Enter submits a non-empty message and Shift+Enter inserts a newline.
 - `Tab` order follows visual order: header eyebrow/name/badge/meta-links → header actions (Approve-slot → Complete → Retry when shown → Delete) → dark-mode toggle (header, reachable independent of tab-order position relative to page content since it lives in the persistent top bar) → Progress (no interactive elements, no Viewed checkbox) → each card's Viewed checkbox in card order (First tasks → Onboarding context → Repositories → Permissions → Checklists → Suggested documentation → Approvals and risks) → Plan chat input → send button.
 - The Viewed checkbox is a native `<input type="checkbox">` (or equivalent ARIA-correct custom checkbox) — `Space` toggles it, standard checkbox semantics, no custom widget behavior to spec.
 - All header links, header buttons, and the dark-mode toggle are standard focusable, `Enter`/`Space`-activatable elements.
@@ -110,7 +110,7 @@ Other in-flight states: button labels swap to their existing in-progress copy ("
 WCAG AA basics — internal tool, not a regulated-grade audit surface.
 
 - Contrast: every color pair in `DESIGN.md.colors`, **in both light and dark mode**, must meet AA text contrast at the sizes it's used (`label-large`, 14px, and `body-medium`, 14px, are the smallest roles carrying this pattern's new text). This explicitly includes the new dark-mode pairs and `review-container`/`review-container-dark`.
-- `{design.colors.success}` / `success-dark` (Viewed-checkbox, Included-tick) is a UI-accent/glyph color, not text — held to WCAG's 3:1 non-text contrast bar against its surrounding surface in both modes, not the 4.5:1 text bar. Never repurpose it for text without re-checking against the stricter bar.
+- `{design.colors.success}` / `success-dark` (Viewed-checkbox) is a UI-accent/glyph color, not text — held to WCAG's 3:1 non-text contrast bar against its surrounding surface in both modes, not the 4.5:1 text bar. Never repurpose it for text without re-checking against the stricter bar.
 - Focus states: header action buttons, header meta links, the dark-mode toggle, and each card's Viewed checkbox must show a visible focus ring — reuse whatever focus treatment `Button`/`IconButton`/links/native checkboxes already carry.
 - Keyboard operability: every interactive element above must be reachable and activatable via keyboard alone, in the `Tab` order specified.
 - The progress stepper is decorative/read-only status information — its status is also conveyed in text via the existing status chip, not via the stepper's color/position alone.
