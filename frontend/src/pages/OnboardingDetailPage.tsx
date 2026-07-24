@@ -52,6 +52,38 @@ function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="text-title-medium font-semibold text-on-surface">{children}</h2>;
 }
 
+interface ReviewableCardProps {
+  cardId: string;
+  title: string;
+  viewed: boolean;
+  onViewedChange: (viewed: boolean) => void;
+  children: ReactNode;
+  className?: string;
+}
+
+function ReviewableCard({ cardId, title, viewed, onViewedChange, children, className = "" }: ReviewableCardProps) {
+  const checkboxId = `viewed-${cardId}`;
+  return (
+    <Card className={`mb-5 transition-colors ${className} ${viewed ? "bg-surface-variant !p-3.5 !px-5 shadow-none" : ""}`}>
+      <div className="flex min-w-0 items-center justify-between gap-4">
+        <h2 className={`min-w-0 break-words text-title-medium font-semibold ${viewed ? "text-on-surface-variant" : "text-on-surface"}`}>{title}</h2>
+        <label htmlFor={checkboxId} className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-label-large text-on-surface-variant">
+          <input
+            id={checkboxId}
+            type="checkbox"
+            checked={viewed}
+            onChange={(event) => onViewedChange(event.target.checked)}
+            aria-label={`Viewed: ${title}`}
+            className="h-4 w-4 rounded accent-success focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          />
+          Viewed
+        </label>
+      </div>
+      {!viewed && <div className="mt-5">{children}</div>}
+    </Card>
+  );
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
@@ -127,14 +159,16 @@ function ProgressCard({ record }: { record: OnboardingRecord }) {
   );
 }
 
-function RepositoriesCard({ record }: { record: OnboardingRecord }) {
+interface ReviewStateProps {
+  viewed: boolean;
+  onViewedChange: (viewed: boolean) => void;
+}
+
+function RepositoriesCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   return (
-    <Card className="mb-5">
+    <ReviewableCard cardId="repositories" title="Repositories" viewed={viewed} onViewedChange={onViewedChange}>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <SectionTitle>Repositories</SectionTitle>
-          <p className="mt-1 text-body-medium text-on-surface-variant">Codebases and setup commands for the first week.</p>
-        </div>
+        <p className="text-body-medium text-on-surface-variant">Codebases and setup commands for the first week.</p>
         <span className="text-label-large text-on-surface-variant">{record.project.repositories.length} connected</span>
       </div>
       <div role="region" aria-label="Repositories table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
@@ -169,11 +203,11 @@ function RepositoriesCard({ record }: { record: OnboardingRecord }) {
           </tbody>
         </table>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
-function PermissionsCard({ record }: { record: OnboardingRecord }) {
+function PermissionsCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   const { permissions } = record.profile;
   const permissionRows = [
     ...permissions.aws.map((permission, index) => ({ permission, system: "AWS", key: `aws-${permission}-${index}` })),
@@ -182,12 +216,14 @@ function PermissionsCard({ record }: { record: OnboardingRecord }) {
   ];
 
   return (
-    <Card className="mb-5">
+    <ReviewableCard
+      cardId="permissions"
+      title={isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}
+      viewed={viewed}
+      onViewedChange={onViewedChange}
+    >
       <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <SectionTitle>{isApprovedStatus(record.status) ? "Approved permissions" : "Requested permissions"}</SectionTitle>
-          <p className="mt-1 text-body-medium text-on-surface-variant">Access needed to contribute safely from day one.</p>
-        </div>
+        <p className="text-body-medium text-on-surface-variant">Access needed to contribute safely from day one.</p>
         <Chip tone={isApprovedStatus(record.status) ? "primary" : "secondary"}>{isApprovedStatus(record.status) ? "Approved" : "Pending"}</Chip>
       </div>
       <div role="region" aria-label="Permissions table" tabIndex={0} className="overflow-x-auto rounded-md border border-outline-variant">
@@ -207,7 +243,7 @@ function PermissionsCard({ record }: { record: OnboardingRecord }) {
                 <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">{row.system}</td>
                 <td className="px-4 py-3">
                   <span className="sr-only">Included</span>
-                  <span aria-hidden="true" className="font-semibold text-primary">✓</span>
+                  <span aria-hidden="true" className="font-semibold text-success">✓</span>
                 </td>
               </tr>
             )) : (
@@ -218,7 +254,7 @@ function PermissionsCard({ record }: { record: OnboardingRecord }) {
           </tbody>
         </table>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
@@ -231,11 +267,10 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function OnboardingContextCard({ record }: { record: OnboardingRecord }) {
+function OnboardingContextCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   return (
-    <Card className="mb-5">
-      <SectionTitle>Onboarding context</SectionTitle>
-      <div className="mt-5 grid gap-6 md:grid-cols-2">
+    <ReviewableCard cardId="onboarding-context" title="Onboarding context" viewed={viewed} onViewedChange={onViewedChange}>
+      <div className="grid gap-6 md:grid-cols-2">
         <div>
           <h3 className="text-label-large font-medium text-on-surface-variant">Business goal</h3>
           <p className="mt-1 break-words text-body-medium text-on-surface">{record.project.business_goal}</p>
@@ -256,7 +291,7 @@ function OnboardingContextCard({ record }: { record: OnboardingRecord }) {
           {record.notes && <InfoItem label="Notes" value={record.notes} />}
         </dl>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
@@ -276,11 +311,10 @@ function ChecklistList({ items }: { items: string[] }) {
   );
 }
 
-function ChecklistsCard({ record }: { record: OnboardingRecord }) {
+function ChecklistsCard({ record, viewed, onViewedChange }: { record: OnboardingRecord } & ReviewStateProps) {
   return (
-    <Card className="mb-5">
-      <SectionTitle>Checklists</SectionTitle>
-      <div className="mt-5 grid gap-6 md:grid-cols-2">
+    <ReviewableCard cardId="checklists" title="Checklists" viewed={viewed} onViewedChange={onViewedChange}>
+      <div className="grid gap-6 md:grid-cols-2">
         <div>
           <h3 className="mb-3 text-label-large font-medium text-on-surface-variant">Day 1</h3>
           <ChecklistList items={record.profile.base_checklist.day_1} />
@@ -290,7 +324,7 @@ function ChecklistsCard({ record }: { record: OnboardingRecord }) {
           <ChecklistList items={record.profile.base_checklist.week_1} />
         </div>
       </div>
-    </Card>
+    </ReviewableCard>
   );
 }
 
@@ -380,6 +414,7 @@ export function OnboardingDetailPage() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewedCards, setViewedCards] = useState<Set<string>>(() => new Set());
   const currentIdRef = useRef(id);
   const historyTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -390,9 +425,23 @@ export function OnboardingDetailPage() {
     setChatError(null);
     setSendingChat(false);
     setLastSentMessage(null);
+    setRecord(null);
+    setViewedCards(new Set());
     if (!id) return;
     getOnboarding(id).then(setRecord).catch((err) => setError(err.message));
   }, [id]);
+
+  function handleViewedChange(cardId: string, viewed: boolean): void {
+    setViewedCards((current) => {
+      const next = new Set(current);
+      if (viewed) {
+        next.add(cardId);
+      } else {
+        next.delete(cardId);
+      }
+      return next;
+    });
+  }
 
   async function handleApprove() {
     if (!id) return;
@@ -434,7 +483,9 @@ export function OnboardingDetailPage() {
     if (!id) return;
     setRetrying(true);
     try {
-      setRecord(await retryGeneration(id, () => undefined));
+      const updated = await retryGeneration(id, () => undefined);
+      setViewedCards(new Set());
+      setRecord(updated);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -487,6 +538,7 @@ export function OnboardingDetailPage() {
         if (currentIdRef.current === chatId) setChatEvents((prev) => [...prev, event]);
       });
       if (currentIdRef.current !== chatId) return;
+      setViewedCards(new Set());
       setRecord(updated);
       setChatMessage("");
     } catch (err) {
@@ -494,7 +546,10 @@ export function OnboardingDetailPage() {
       setChatError((err as Error).message);
       try {
         const refreshed = await getOnboarding(chatId);
-        if (currentIdRef.current === chatId) setRecord(refreshed);
+        if (currentIdRef.current === chatId) {
+          setViewedCards(new Set());
+          setRecord(refreshed);
+        }
       } catch {
         // The original chat error remains visible when the best-effort refresh fails.
       }
@@ -605,25 +660,54 @@ export function OnboardingDetailPage() {
           {record.notification && <div className="mb-5 rounded-md border border-primary/20 bg-primary-container px-4 py-3 text-body-medium text-on-primary-container">Sent to <strong>{record.notification.sentTo}</strong> at {new Date(record.notification.sentAt).toLocaleTimeString()}.</div>}
 
           <ProgressCard record={record} />
-          <Card className="mb-5">
-            <SectionTitle>First tasks</SectionTitle>
-            <div className="mt-4"><BulletList items={record.project.first_tasks} /></div>
-          </Card>
-          <OnboardingContextCard record={record} />
-          <RepositoriesCard record={record} />
-          <PermissionsCard record={record} />
-          <ChecklistsCard record={record} />
-          <Card className="mb-5">
-            <SectionTitle>Suggested documentation</SectionTitle>
-            <div className="mt-4"><BulletList items={record.project.key_docs} /></div>
-          </Card>
-          <Card className="mb-5 border-amber-200 bg-amber-50">
-            <SectionTitle>Approvals and risks</SectionTitle>
-            <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <ReviewableCard
+            cardId="first-tasks"
+            title="First tasks"
+            viewed={viewedCards.has("first-tasks")}
+            onViewedChange={(viewed) => handleViewedChange("first-tasks", viewed)}
+          >
+            <div><BulletList items={record.project.first_tasks} /></div>
+          </ReviewableCard>
+          <OnboardingContextCard
+            record={record}
+            viewed={viewedCards.has("onboarding-context")}
+            onViewedChange={(viewed) => handleViewedChange("onboarding-context", viewed)}
+          />
+          <RepositoriesCard
+            record={record}
+            viewed={viewedCards.has("repositories")}
+            onViewedChange={(viewed) => handleViewedChange("repositories", viewed)}
+          />
+          <PermissionsCard
+            record={record}
+            viewed={viewedCards.has("permissions")}
+            onViewedChange={(viewed) => handleViewedChange("permissions", viewed)}
+          />
+          <ChecklistsCard
+            record={record}
+            viewed={viewedCards.has("checklists")}
+            onViewedChange={(viewed) => handleViewedChange("checklists", viewed)}
+          />
+          <ReviewableCard
+            cardId="suggested-documentation"
+            title="Suggested documentation"
+            viewed={viewedCards.has("suggested-documentation")}
+            onViewedChange={(viewed) => handleViewedChange("suggested-documentation", viewed)}
+          >
+            <div><BulletList items={record.project.key_docs} /></div>
+          </ReviewableCard>
+          <ReviewableCard
+            cardId="approvals-risks"
+            title="Approvals and risks"
+            viewed={viewedCards.has("approvals-risks")}
+            onViewedChange={(viewed) => handleViewedChange("approvals-risks", viewed)}
+            className="border-amber-200 bg-amber-50"
+          >
+            <div className="grid gap-6 md:grid-cols-2">
               <div><p className="mb-2 text-label-large font-medium text-amber-900">Approvals required</p><BulletList items={record.profile.approvals_required} /></div>
               <div><p className="mb-2 text-label-large font-medium text-amber-900">Project risk notes</p><BulletList items={record.project.risk_notes} /></div>
             </div>
-          </Card>
+          </ReviewableCard>
         </main>
         <aside className="sticky top-16 h-[calc(100vh-4rem)] w-[440px] shrink-0 overflow-hidden">
           <ChatPanel
