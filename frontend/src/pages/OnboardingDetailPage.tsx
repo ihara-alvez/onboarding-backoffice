@@ -32,12 +32,13 @@ const progressStages: Array<{ status: OnboardingStatus; label: string }> = [
   { status: "completed", label: "Completed" },
 ];
 
-function BulletList({ items }: { items: string[] }) {
+function BulletList({ items, tone = "surface" }: { items: string[]; tone?: "surface" | "review" }) {
+  const textClass = tone === "review" ? "text-on-review-container" : "text-on-surface";
   if (items.length === 0) {
-    return <p className="text-body-medium text-on-surface-variant">None.</p>;
+    return <p className={`text-body-medium ${textClass}`}>None.</p>;
   }
   return (
-    <ul className="space-y-2 text-body-medium text-on-surface">
+    <ul className={`space-y-2 text-body-medium ${textClass}`}>
       {items.map((item, i) => (
         <li key={i} className="flex gap-2">
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
@@ -701,11 +702,11 @@ export function OnboardingDetailPage() {
             title="Approvals and risks"
             viewed={viewedCards.has("approvals-risks")}
             onViewedChange={(viewed) => handleViewedChange("approvals-risks", viewed)}
-            className="border-amber-200 bg-amber-50"
+            className="border-review-container bg-review-container"
           >
             <div className="grid gap-6 md:grid-cols-2">
-              <div><p className="mb-2 text-label-large font-medium text-amber-900">Approvals required</p><BulletList items={record.profile.approvals_required} /></div>
-              <div><p className="mb-2 text-label-large font-medium text-amber-900">Project risk notes</p><BulletList items={record.project.risk_notes} /></div>
+              <div><p className="mb-2 text-label-large font-medium text-on-review-container">Approvals required</p><BulletList tone="review" items={record.profile.approvals_required} /></div>
+              <div><p className="mb-2 text-label-large font-medium text-on-review-container">Project risk notes</p><BulletList tone="review" items={record.project.risk_notes} /></div>
             </div>
           </ReviewableCard>
         </main>

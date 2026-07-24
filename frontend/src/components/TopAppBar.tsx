@@ -2,7 +2,15 @@ import { Link, useLocation } from "react-router-dom";
 import {
   BellIcon,
   MagnifyingGlassIcon,
+  MoonIcon,
+  SunIcon,
 } from "@heroicons/react/24/outline";
+import type { Theme } from "../theme";
+
+interface TopAppBarProps {
+  theme: Theme;
+  onToggleTheme: () => void;
+}
 
 function BrandMark() {
   return (
@@ -15,7 +23,7 @@ function BrandMark() {
   );
 }
 
-export function TopAppBar() {
+export function TopAppBar({ theme, onToggleTheme }: TopAppBarProps) {
   const location = useLocation();
   const peopleActive =
     location.pathname === "/" || location.pathname.startsWith("/onboardings");
@@ -70,6 +78,19 @@ export function TopAppBar() {
         </button>
         <button
           type="button"
+          aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          aria-pressed={theme === "dark"}
+          onClick={onToggleTheme}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          {theme === "dark" ? (
+            <MoonIcon className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <SunIcon className="h-5 w-5" aria-hidden="true" />
+          )}
+        </button>
+        <button
+          type="button"
           aria-label="Notifications"
           className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
@@ -84,7 +105,7 @@ export function TopAppBar() {
         </span>
         <Link
           to="/new"
-          className="rounded-xl bg-primary px-5 py-2.5 text-label-large font-medium text-on-primary no-underline shadow-elevation-1 hover:opacity-90"
+          className="rounded-xl bg-primary px-5 py-2.5 text-label-large font-medium text-on-primary no-underline shadow-elevation-1 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           New onboarding
         </Link>
